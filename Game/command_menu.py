@@ -1,8 +1,13 @@
 """The JRPG command ring: ATTACK, GUARD, ITEM.
 
-A blue wheel with a lettered button per direction and the command name
-spelled out beside it, in the Persona-style command block.
+A blue wheel with a lettered button per command and the name spelled out
+beside it. The selected slot never moves: picking a command turns the whole
+wheel until that command arrives there, and every label rides around with it,
+tilting as it goes. Neighbours sit SPACING degrees off, so whatever is one
+step away reads at that tilt.
 """
+
+import math
 
 import pygame
 
@@ -17,6 +22,14 @@ BUTTON_EDGE = (235, 242, 255)
 TEXT_COLOR = (255, 255, 255)
 TEXT_SHADOW = (10, 18, 50)
 DIM = (150, 165, 200)
+
+PULSE_SPEED = 5.2    # radians a second, for the button that is picked
+PULSE_PIXELS = 2.4   # how much bigger that button swells
+BREATHE_PIXELS = 1.6  # and how much the ring behind it drifts in and out
+
+SPACING = 45       # degrees between neighbouring commands on the wheel
+TURN_SPEED = 11.0  # how fast the wheel catches up with the pick, per second
+NOTCHES = 12       # ticks around the rim, so the turning is visible
 
 
 class Command:
@@ -33,7 +46,7 @@ class Command:
 class CommandMenu:
     RADIUS = 72
     BUTTON_RADIUS = 15
-    BUTTON_OFFSET = 34
+    BUTTON_OFFSET = 48  # far enough out that neighbours SPACING apart clear
 
     def __init__(self):
         self.commands = [
@@ -42,8 +55,29 @@ class CommandMenu:
             Command(ITEM, "ITEM", "Y", (-1, 0), "left"),
         ]
         self.index = 0
+        self.elapsed = 0.0  # drives the pulsing
+        self.angle = 0.0    # how far the wheel has turned, in degrees
         self._font = None
         self._button_font = None
+
+    def update(self, dt):
+        self.elapsed += dt
+        # ease towards the turn that brings the pick round to the slot
+        self.angle += (self.turn_to - self.angle) * min(1.0, dt * TURN_SPEED)
+
+    @property
+    def turn_to(self):
+        """The wheel angle that puts the current pick in the selected slot."""
+        return self.index * SPACING
+
+    def angle_of(self, i):
+        """Where command `i` sits right now; 0 is the selected slot."""
+        return self.angle - i * SPACING
+
+    @property
+    def pulse(self):
+        """-1 to 1, the beat the selected button swells on."""
+        return math.sin(self.elapsed * PULSE_SPEED)
 
     # ------------------------------------------------------------------ input
 
@@ -85,41 +119,65 @@ class CommandMenu:
         center = pygame.Vector2(center)
         self._draw_ring(surface, center)
 
-        for i, command in enumerate(self.commands):
+        # furthest from the slot first, so the pick lands on top of the rest
+        for i in sorted(range(len(self.commands)), key=lambda i: -abs(self.angle_of(i))):
+            command = self.commands[i]
+            angle = self.angle_of(i)
             selected = i == self.index
-            button_pos = center + command.direction * self.BUTTON_OFFSET
-            pygame.draw.circle(surface, BUTTON_FILL, button_pos, self.BUTTON_RADIUS)
+            heading = pygame.Vector2(1, 0).rotate(angle)
+            button_pos = center + heading * self.BUTTON_OFFSET
+            radius = self.BUTTON_RADIUS + (self.pulse * PULSE_PIXELS if selected else 0)
+            pygame.draw.circle(surface, BUTTON_FILL, button_pos, radius)
             pygame.draw.circle(
                 surface,
                 BUTTON_EDGE if selected else DIM,
                 button_pos,
-                self.BUTTON_RADIUS,
+                radius,
                 3 if selected else 2,
             )
             glyph = self._button_font.render(command.button, True, BUTTON_EDGE)
             surface.blit(glyph, glyph.get_rect(center=button_pos))
 
-            self._draw_label(surface, command, button_pos, selected)
+            self._draw_label(surface, center, command, heading, angle, selected)
 
     def _draw_ring(self, surface, center):
         size = self.RADIUS * 2 + 8
+        radius = self.RADIUS + self.pulse * BREATHE_PIXELS
         ring = pygame.Surface((size, size), pygame.SRCALPHA)
-        pygame.draw.circle(ring, (*RING_COLOR, 205), (size // 2, size // 2), self.RADIUS)
-        pygame.draw.circle(ring, (*RING_EDGE, 120), (size // 2, size // 2), self.RADIUS, 3)
+        middle = pygame.Vector2(size / 2, size / 2)
+        pygame.draw.circle(ring, (*RING_COLOR, 205), middle, radius)
+        pygame.draw.circle(ring, (*RING_EDGE, 120), middle, radius, 3)
+        # ticks on the rim: without them a wheel of three reads as labels
+        # swapping places rather than as something turning
+        for notch in range(NOTCHES):
+            out = pygame.Vector2(1, 0).rotate(self.angle + notch * (360 / NOTCHES))
+            pygame.draw.line(
+                ring,
+                (*RING_EDGE, 90),
+                middle + out * (radius - 11),
+                middle + out * (radius - 3),
+                2,
+            )
         surface.blit(ring, ring.get_rect(center=center))
 
-    def _draw_label(self, surface, command, button_pos, selected):
+    def _draw_label(self, surface, center, command, heading, angle, selected):
+        """The name, out past its button and turned to match the wheel."""
         color = TEXT_COLOR if selected else DIM
         text = self._font.render(command.label, True, color)
-        rect = text.get_rect()
-        gap = self.BUTTON_RADIUS + 10
-        if command.align == "right":
-            rect.midleft = (button_pos.x + gap, button_pos.y + 4)
-        else:
-            rect.midright = (button_pos.x - gap, button_pos.y + 4)
+        shadow = self._font.render(command.label, True, TEXT_SHADOW)
 
         # cheap outline so the text stays readable over the battlefield
-        shadow = self._font.render(command.label, True, TEXT_SHADOW)
+        plate = pygame.Surface(
+            (text.get_width() + 8, text.get_height() + 8), pygame.SRCALPHA
+        )
         for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2)):
-            surface.blit(shadow, rect.move(dx, dy))
-        surface.blit(text, rect)
+            plate.blit(shadow, (4 + dx, 4 + dy))
+        plate.blit(text, (4, 4))
+
+        turned = pygame.transform.rotate(plate, -angle)
+        if not selected:
+            turned.set_alpha(180)
+        # measured from the rim, not the button, so a short word like ITEM is
+        # pushed as clear of the wheel as a long one
+        reach = self.RADIUS + 14 + text.get_width() / 2
+        surface.blit(turned, turned.get_rect(center=center + heading * reach))
