@@ -14,7 +14,7 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent / "Assets"
 ICON = "icon.png"
 PLAYER = "makoto.png"
 # Every HEAD rolls one of these at spawn, so a row of them is a mixed bunch.
-ENEMIES = ("monster1.png", "verity.png", "plummet.png")
+ENEMIES = ("monster1.png", "verity.png", "plummet.png", "baibai.png", "persona.png")
 ENEMY = ENEMIES[0]
 BACKGROUND = "bg1.png"
 FLOOR = "floor.png"
