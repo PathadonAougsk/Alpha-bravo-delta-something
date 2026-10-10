@@ -16,19 +16,24 @@ from command_menu import CommandMenu
 from enemy import Enemy
 from gunshot import Gunshot
 from intro import Intro
+from item_flash import ItemFlash
 from item_menu import ItemMenu
-from mercy import Mercy
+from determination import Determination
+from music import Music
 from outro import Outro
 from player import Player
 from stats import BASE
+from textbox import TextBox
 
 WIDTH, HEIGHT = 800, 600
 FPS = 12
-MERCY_FPS = 48  # the mercy box is a dodging game: the battle can sit at 12
-                # frames, but something you steer away from bones cannot
+DETERMINATION_FPS = 48  # the determination box is a dodging game: the
+                        # battle can sit at 12 frames, but something you
+                        # steer away from bones cannot
 BG = (18, 18, 24)
 FLOOR = (26, 28, 40)
-END_LINGER = 2.5  # seconds the result banner stays up before the window closes
+END_LINGER = 0.4  # a beat after the ending has played out, before the
+                  # window closes; the ending sets its own length
 HORIZON = 0.45    # where the wall ends and the floor begins
 
 # The wall is zoomed to cover, so there is always more of it than fits: it can
@@ -36,6 +41,9 @@ HORIZON = 0.45    # where the wall ends and the floor begins
 DRIFT_PIXELS = 7.0
 DRIFT_SPEED = 0.35
 MESSAGE_SLIDE = 0.22  # seconds a new message takes to slide in
+# Where the text box sits: across the bottom, wide enough to be the thing you
+# are looking at, and stopping short of the HUD panel in the corner.
+TALK = (24, 360, 752, 150)
 RETRO = 2 # default retro filter: the frame is crunched to 1/N and blown back
            # up. 3 and over starts eating the message strip and the HUD numbers.
 
@@ -163,25 +171,40 @@ def main(argv=None, title=None, before_close=None):
     battle = Battle(player, enemies, base=args.base)
     menu = CommandMenu()
     bag = ItemMenu()
+    flash = ItemFlash(WIDTH, HEIGHT)
+    talk = TextBox()
     gunshot = Gunshot(WIDTH, HEIGHT)
-    mercy = Mercy(WIDTH, HEIGHT)
+    determination = Determination(WIDTH, HEIGHT)
     intro = Intro(WIDTH, HEIGHT)
     outro = Outro(WIDTH, HEIGHT)
+    song = Music()
+    song.start()  # loud over the intro, down under the fight by the first turn
 
     running = True
     end_timer = 0.0
     elapsed = 0.0
     message_age = 0.0
     shown_message = battle.message
+    shown_uses = battle.items_used
     while running:
-        dt = clock.tick(MERCY_FPS if battle.dodging else FPS) / 1000.0
+        # the box types, the dodging, the item wipe and the ending all run
+        # at the higher rate: they are things you watch moving rather than
+        # things you wait on, and glass falling at 12 frames is a slideshow
+        smooth = (
+            battle.dodging
+            or battle.choosing_determination
+            or flash.live
+            or battle.over
+        )
+        dt = clock.tick(DETERMINATION_FPS if smooth else FPS) / 1000.0
         elapsed += dt
+        song.advance(dt)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
+                pass  # swallowed: the window is closed, not escaped out of
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
                 retro = 1 if retro > 1 else args.retro  # off, for a clear read
             elif intro.running:
@@ -212,6 +235,22 @@ def main(argv=None, title=None, before_close=None):
                         battle.confirm_item()
                     elif event.key in (pygame.K_BACKSPACE, pygame.K_x):
                         battle.cancel_item()
+            elif battle.choosing_determination:
+                # the choices run across the box, so left and right walk them
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                        battle.move_determination(1)
+                    elif event.key in (pygame.K_LEFT, pygame.K_UP):
+                        battle.move_determination(-1)
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                        # the same key lands the rest of the line first, so a
+                        # press while it is still typing cannot pick anything
+                        if talk.typed:
+                            battle.confirm_determination()
+                        else:
+                            talk.skip()
+                    elif event.key in (pygame.K_BACKSPACE, pygame.K_x):
+                        battle.cancel_determination()
             elif battle.accepting_input:
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
                     battle.autobattle()
@@ -229,14 +268,27 @@ def main(argv=None, title=None, before_close=None):
         elif battle.dodging:
             # the box runs off held keys rather than presses, so it is handed
             # the keyboard itself instead of the events the rest of the game uses
-            if not mercy.live:
-                mercy.begin(player, battle.living_enemies)
-            mercy.advance(dt, pygame.key.get_pressed())
-            if mercy.done:
-                battle.finish_dodge(mercy.survived, mercy.taken)
-                mercy.clear()
+            if not determination.live:
+                determination.begin(player, battle.living_enemies)
+            determination.advance(dt, pygame.key.get_pressed())
+            if determination.done:
+                battle.finish_dodge(determination.survived, determination.taken)
+                determination.clear()
         else:
             battle.update(dt)
+
+        if battle.choosing_determination:
+            # determination is yours to offer, so you are the one talking: your own
+            # face goes in the margin of the box
+            if not talk.live:
+                talk.say(
+                    battle.determination_lines,
+                    portrait=assets.PLAYER,
+                    options=battle.determination_labels,
+                )
+            talk.advance(dt)
+        elif talk.live:
+            talk.close()
 
         # the field keeps moving whoever's turn it is, so these are driven
         # here rather than from Battle.update, which idles on the player's turn
@@ -244,6 +296,13 @@ def main(argv=None, title=None, before_close=None):
         for fighter in battle.enemies:
             fighter.update(dt)
         menu.update(dt)
+
+        if battle.items_used != shown_uses:
+            shown_uses = battle.items_used
+            # the gun takes the screen its own way, so it gets no wipe
+            if not battle.watching_cutscene:
+                flash.begin()  # out of the middle of the screen
+        flash.advance(dt)
 
         if battle.message != shown_message:
             shown_message, message_age = battle.message, 0.0
@@ -264,9 +323,9 @@ def main(argv=None, title=None, before_close=None):
             pygame.display.flip()
             continue
 
-        if battle.dodging and mercy.covering:
+        if battle.dodging and determination.covering:
             # the box owns the screen the way the gun does: no field, no HUD
-            mercy.draw(frame)
+            determination.draw(frame)
             present(screen, frame, retro)
             pygame.display.flip()
             continue
@@ -275,7 +334,7 @@ def main(argv=None, title=None, before_close=None):
             # the fight is decided: the splash takes the screen for a beat,
             # then the window hands back to whoever asked for the battle
             end_timer += dt
-            if end_timer >= END_LINGER:
+            if end_timer >= outro.total + END_LINGER:
                 running = False
             outro.draw(frame, battle.result, end_timer)
             present(screen, frame, retro)
@@ -308,6 +367,10 @@ def main(argv=None, title=None, before_close=None):
                 battle.stock,
                 battle.item_index,
             )
+        elif battle.choosing_determination:
+            # the box is not a panel on the field: it takes the bottom of the
+            # screen outright, and the field waits behind it
+            talk.draw(frame, TALK, battle.determination_index)
 
         draw_player_bars(frame, font, player, battle.items)
         if battle.can_autobattle or battle.autobattle_enabled:
@@ -315,17 +378,25 @@ def main(argv=None, title=None, before_close=None):
             frame.blit(font.render(label, True, (255, 220, 120)), (12, HEIGHT - 32))
         draw_message(frame, font, battle.message, message_age)
 
+        if flash.live:
+            # the item's wipe, over the finished frame: the HUD it heals goes
+            # under the blue with everything else
+            flash.draw(frame)
+
         if battle.dodging:
             # the last beat of the box: the black it left falls off the
             # battle in panes, which have to go over the finished frame
-            mercy.draw(frame)
+            determination.draw(frame)
 
         if intro.running:
             intro.draw(frame, player)  # the black lifting off the finished frame
 
-        present(screen, frame, retro)
+        # the item wipe winds the retro filter up and back down with it, so
+        # the heal blocks the screen up and it comes back into focus after
+        present(screen, frame, flash.crunch(retro))
         pygame.display.flip()
 
+    song.stop()
     try:
         if before_close is not None:
             before_close()

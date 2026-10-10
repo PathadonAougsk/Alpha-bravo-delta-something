@@ -1,7 +1,7 @@
 """Glass: the cracks that run out from a point, and the panes they leave.
 
 Two screens break in this game - the one the gun takes out and the one the
-mercy box comes back through - and they break the same way, so the geometry
+determination box comes back through - and they break the same way, so the geometry
 of it lives here rather than in either of them. Nothing in here knows what it
 is cutting up: hand it a surface and the point the blow landed on.
 """

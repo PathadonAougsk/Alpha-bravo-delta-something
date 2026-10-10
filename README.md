@@ -97,12 +97,18 @@ Arrow keys pick a command on the ring, Enter confirms:
   it along the living HEADs, Enter swings and Backspace puts it away.
 - **GUARD** - halve the damage you take for the coming round, and give every
   swing that comes in a `GUARD_FIZZLE` (40%) chance of failing outright.
-- **ITEM** - heal; you start with three.
-- **MERCY** - only once you are down to half HP or less. Offer it and the
-  fight stops being a fight: the screen turns into Undertale, a white box with
-  a red heart in it, and a wave of bones you have to dodge with nothing but
-  the arrows. Survive it and the turn comes straight back to you; don't, and
-  the heart breaks.
+- **ITEM** - heal; you start with three. Taking one out wipes the screen: a
+  blue circle opens in the middle of it and grows until there is nothing but
+  blue, and then the blue fades off the battle underneath. The retro filter
+  is wound up to `PIXELS` (14) along with it and back down again, so the
+  heal blocks the whole screen up and it comes back into focus after.
+- **DETERMINATION** - only once you are down to half HP or less. Picking it
+  opens a text box with your own face in the margin and two ways out laid
+  along the bottom of it: Spare, and Flee. Spare and the fight stops being a
+  fight: the screen turns into Undertale, a white box with a red heart in it,
+  and a wave of bones, bone walls and skulls you have to dodge with nothing
+  but the arrows. Survive it and you get the turn back and the whole HP bar
+  with it; don't, and the heart breaks.
 
 Every hit that lands puts the number it took off up over the body it came
 off, floating up and fading as it goes - the guarded half included, so a
@@ -114,33 +120,70 @@ itself back up rather than on hitting you. So a guard that catches a swing
 costs that HEAD two turns, not one - which is what makes guarding worth a
 turn against a HEAD that outweighs you.
 
-### MERCY
+### DETERMINATION
 
-MERCY is a last resort rather than an opening move, so the wheel will not
-take it while you are still standing comfortably: it opens at `MERCY_AT` (50%)
-of your health and stays shut above that. A shut command is drawn greyed out -
-sunken button, grey label, even when it is the one picked - and pressing Enter
-on it says what it is waiting for and costs you nothing. It lights up by
-itself the moment a HEAD takes you under half, which is also the moment it
-stops being a stunt: the wave bites with the HEADs' real damage against
-whatever HP you have left.
+DETERMINATION is a last resort rather than an opening move, so the wheel will
+not take it while you are still standing comfortably: it opens at
+`DETERMINATION_AT` (50%) of your health and stays shut above that. A shut
+command is drawn greyed out - sunken button, grey label, even when it is the
+one picked - and pressing Enter on it says what it is waiting for and costs
+you nothing. It lights up by itself the moment a HEAD takes you under half,
+which is also the moment it stops being a stunt: the wave bites with the
+HEADs' real damage against whatever HP you have left.
 
-Picking MERCY hands the whole screen to a dodging game. The field, the wheel
+Picking DETERMINATION does not spend the turn either. It opens a text box
+across the bottom of the screen - black, ruled in white, with your own face in
+the left margin, because the determination is yours to find - and types out
+what you have to say a letter at a time, behind the asterisk Undertale
+narrates everything with. Enter while it is still typing lands the rest of the
+line rather than picking anything. Once the line is up, the two ways out
+appear along the bottom of the box with the soul in front of whichever one is
+picked and that one lit in Undertale's yellow: left and right walk the pick,
+Enter takes it, and Backspace shuts the box without spending the turn. Below
+`DETERMINATION_LOW` (25%) of your health the box stops narrating the HEADs and
+starts talking to you.
+
+- **Spare** is the dare, and hands the screen to the dodging game below.
+- **Flee** is not one: there is no running from a formation that has already
+  surrounded you, so the turn is spent finding that out and the HEADs get
+  their round.
+
+Sparing them hands the whole screen to the dodging game. The field, the wheel
 and the HUD drop away and what is left is a white rule on black with a red
 heart sitting in the middle of it - the soul - with the HP counted off
 underneath in Undertale's yellow. The arrows move the heart and nothing else
 does anything at all: there is no attacking your way out of the wave, and the
 turn is spent not being hit.
 
-Three things come at you, on a cadence that tightens as the wave runs: bones
-dropping in through the roof with a column left open, a rank of them sliding
-in from one side with a row to slip through, and pellets that appear hollow
-around the rim, take their aim at wherever the heart is standing, and then
-come. The hollow ones are the only warning anything gives, which is the whole
-pattern: the aim is taken when they appear, so the warning is long enough to
-walk out of. Shots are drawn for a run-up outside the box as well as inside
-it, so nothing arrives unseen, and the line along the top of the box drains
-with the wave, so you can see how much of the turn is left.
+Six things come at you, on a cadence that tightens as the wave runs, and the
+wave escalates: it opens on bones, brings the skulls and the walls out a
+third of the way in, and the blue walls halfway.
+
+- **Rain** - bones dropping in through the roof with a column left open.
+- **Sweeps** - a rank of them sliding in from one side with a row to slip
+  through.
+- **Pellets** - they appear hollow around the rim, take their aim at wherever
+  the heart is standing, and then come. The aim is taken when they appear, so
+  the warning is long enough to walk out of.
+- **Walls** - a rank of bone the depth of the box with one slot in it. There
+  is no dodging it on the spot: you line the heart up with the slot and ride
+  it across.
+- **Blue walls** - the same thing with no slot at all, in blue. A blue bone
+  only bites what moves, so the way through is to take your hands off the
+  arrows and let it pass. It starts most of a box-width outside the box and
+  nothing else is thrown while it is on its way or crossing, so what you have
+  to stand still through is only ever the wall itself - and the box says what
+  the rule is for as long as one is up.
+- **Skulls** - a head lines up on the row or the column you are standing in,
+  draws a grey line down it, charges where you can see it charging, and then
+  the beam is simply on across the whole box for a beat. The charge is the
+  dodge; once it is firing there is nothing to do but already be elsewhere.
+
+Hollow is the word for not-yet throughout: a hollow pellet, a grey line, a
+shape drawn in outline cannot hit you. Shots are drawn for a run-up outside
+the box as well as inside it, so nothing arrives unseen, and the line along
+the top of the box drains with the wave, so you can see how much of the turn
+is left.
 
 A bone that gets through bites for what the average HEAD swings for, and
 leaves the heart flickering and untouchable for a beat afterwards. Both
@@ -154,7 +197,14 @@ heart, a crack opens down it, it hangs there for a beat and then bursts into
 pieces that arc up and fall out of the screen - and that is the game over,
 straight into the DEFEAT splash.
 
-Live through the wave instead and the screen goes black, cracks run out from
+Live through it and you get the bar back - all of it, not just what the bones
+took. The wave is the hardest thing in the fight and it is only offered at
+half health or less, so what a whole round of not being hit pays is a whole
+HP bar, which is also what makes walking into one on purpose worth the risk.
+Since DETERMINATION shuts again above half health, the full bar locks the
+box behind you until a HEAD opens it again.
+
+Live through the wave and the screen goes black, cracks run out from
 the middle of it, and the black comes apart into panes that turn over as they
 fall away, leaving the battle exactly where you left it - the field, the
 HEADs, the HUD and the message - except that it is your turn again. The wave
@@ -164,19 +214,23 @@ cracking and the panes are the same glass the gun breaks the screen with; it
 lives in `glass.py` and both of them hand it the point the blow landed on.
 
 The battle runs at 12 frames a second, which is the retro look working as
-intended and is no way to dodge anything, so the loop ticks at `MERCY_FPS`
-(48) for as long as the box is up and drops back to 12 the moment it lets go.
-Everything in the game is driven off elapsed time rather than frames, so
-nothing else notices.
+intended and is no way to dodge anything, so the loop ticks at
+`DETERMINATION_FPS` (48) for as long as the box is up and drops back to 12 the
+moment it lets go. Everything in the game is driven off elapsed time rather
+than frames, so nothing else notices.
 
 Press **A** on your first turn, before any command has spent it, to start
 **autobattle**. The player immediately swings at the picked HEAD and
 automatically attacks the next living one on every following turn until
 victory or defeat - it drives the field cursor itself, so there is nothing to
 confirm. Enemies still take their normal turns; autobattle does not guard,
-open the bag or offer mercy. It lasts for the current battle, and Escape or
+open the bag or stand its ground. It lasts for the current battle, and
 closing the window still quits early. If the intro is running, the first key
 only skips it; press A once the fight begins.
+
+Escape does nothing. It is swallowed before anything else sees it, so a
+stray press cannot drop you out of a fight, skip the intro or dismiss the
+result - closing the window is the way out.
 
 Both Feature Branch and each HEAD roll their damage within that +/-10% spread
 on every attack, and every attack has a 2% chance to land a critical hit for
@@ -194,16 +248,31 @@ where a label would hang over the field upside down, so labels fade out as
 they pass 90 and the back of the wheel carries nothing but its button.
 
 Each battle opens on a black screen that splits across the middle: the two
-halves part on a lit seam to reveal the player behind them, a flat blue cut-out
-standing the full height of the screen. It shrinks to its own size as it
-travels to the spot it fights from, and the moment it lands the colour washes
-in over the whole frame and the fight begins. Nothing moves and no input is
-taken until it has landed; any key skips it.
+halves part on a lit seam, laid over at `cut.CUT` (45 degrees) so the fight is
+let out on a diagonal and the corners of it show first, revealing the player
+behind them - a flat blue cut-out standing the full height of the screen. It
+shrinks to its own size as it travels to the spot it fights from, and the
+moment it lands the colour washes in over the whole frame and the fight
+begins. Nothing moves and no input is taken until it has landed; any key skips
+it.
 
-When the fight is decided the field gives way to a splash: a white-out, a
-burst of spokes, and the player across it huge and flipped, with VICTORY or
-DEFEAT stamped over the top. It holds for a couple of seconds and the window
-closes on its own, so the next hunk's battle - or the next file - follows
+When the fight is decided it ends the way the gun does. The last frame of
+the battle is caught and held: the blow blows it out - white on a win, red
+on a loss - and kicks the lens, cracks run out from the middle of it, and
+the whole frozen fight comes apart into panes that turn over as they fall.
+What is behind the glass this time is not nothing, though. The splash is
+already standing there: a burst of spokes, the player across it huge and
+flipped, and VICTORY or DEFEAT stamping over the top, with the whole thing
+creeping a few per cent closer the longer it is held.
+
+The last beat is the intro's, run backwards - the same cut, out of the same
+`cut.py`, walked the other way. The battle opened on two black halves parting
+on a lit seam; it closes on them coming back down, so the corners are the
+first thing the black takes and the middle is the last. A win is left framed
+by it. A loss waits until the stamp has been up long enough to read, and then
+the halves carry on until they meet and the screen is shut. The ending sets
+its own length (`Outro.total`, about three seconds) and the window closes on
+its own after it, so the next hunk's battle - or the next file - follows
 without waiting. The window title counts the hunks off: `conflict 2/3`.
 
 The HUD is drawn square: hard corners, no rounding.
@@ -233,6 +302,12 @@ HEAD), `bg1.png` (the wall, drawn once and zoomed to fill it), `floor.png`
 (tiled floor), `sword.png` (held in the player's hand) and `icon.png` (the
 window icon). Any file that is missing simply falls back to the plain shapes,
 so the game still runs without them.
+
+The song goes in the same folder, as `opening.ogg` (or `.mp3`, or `.wav`). It
+starts with the battle at 80% volume, holds there for three seconds while the
+intro lifts, then slides down to 10% and stays there, looping under the rest
+of the fight. No file, no mixer or no audio device and the battle simply runs
+quiet.
 
 The sword is held rather than pointed at anything, so the target a command
 would hit is the one whose name is lit up.
@@ -267,3 +342,13 @@ checks use disposable temporary directories):
 ```sh
 python -m unittest discover -s tests
 ```
+
+## Credits
+
+The opening song is **"It's Going Down Now"** from *Persona 3 Reload*
+(ATLUS / SEGA). Taken from:
+
+<https://www.youtube.com/watch?v=v6PDPMQVGDM>
+
+The audio file itself is not in this repository - drop your own copy in
+`Assets/` as `opening.ogg` and the game will pick it up.

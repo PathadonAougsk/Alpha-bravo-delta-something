@@ -1,15 +1,16 @@
 """The run-up to the battle.
 
-The screen opens black and splits across the middle: the two halves part on a
-lit seam to reveal the player behind them, a flat blue cut-out standing the
-full height of the screen. It shrinks back to its own size as it travels to
-the spot it fights from, and the moment it lands the colour washes in and the
-battle is on.
+The screen opens black and splits across the middle: the two halves part on
+a lit seam laid over at 45 degrees, letting the player out from behind them
+- a flat blue cut-out standing the full height of the screen. It shrinks
+back to its own size as it travels to the spot it fights from, and the
+moment it lands the colour washes in and the battle is on.
 """
 
 import pygame
 
 import assets
+import cut
 from player import SPRITE_HEIGHT
 
 FIGURE = (72, 148, 255)  # the blue the cut-out comes in as
@@ -20,7 +21,6 @@ HOLD = 0.12    # beat with the cut-out standing there at full height
 TRAVEL = 0.56  # seconds it takes to reach the spot it fights from
 WASH = 0.3     # seconds the colour takes to come back once it lands
 FILL = 1.0     # how much of the screen the cut-out covers to start: 1 fills it
-SEAM = 3       # the lit edge each half parts on
 
 
 def ease_out(progress):
@@ -132,12 +132,10 @@ class Intro:
         surface.blit(veil, (0, 0))
 
     def draw_halves(self, surface):
-        """The two black halves, parting from the middle on a lit seam."""
-        width, height = self.size
-        half = height / 2
-        shift = half * self.parted
-        pygame.draw.rect(surface, BACKDROP, (0, -shift, width, half))
-        pygame.draw.rect(surface, BACKDROP, (0, half + shift, width, half))
-        if shift > 0:  # the lit edge, until the halves are gone
-            pygame.draw.rect(surface, FIGURE, (0, half - shift - SEAM, width, SEAM))
-            pygame.draw.rect(surface, FIGURE, (0, half + shift, width, SEAM))
+        """The two black halves, parting off the middle on a lit seam.
+
+        Laid over at `cut.CUT`, so the fight is let out on a diagonal and
+        the corners of it show first - and the ending brings the same cut
+        back down over the splash at the end.
+        """
+        cut.draw_halves(surface, self.size, self.parted, BACKDROP, FIGURE)

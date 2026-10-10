@@ -2,15 +2,17 @@
 
 import random
 
-from command_menu import ATTACK, GUARD, ITEM, MERCY
+from command_menu import ATTACK, GUARD, ITEM, DETERMINATION
 from items import GUN, GUN_STOCK, HEALTH, LABELS, ORDER
-from stats import BASE, GUARD_FIZZLE, ITEM_HEAL, MERCY_AT
+from stats import BASE, GUARD_FIZZLE, ITEM_HEAL, DETERMINATION_AT
 
 PLAYER_TURN = "player"
 TARGETING = "targeting"      # the cursor is out over the field
 CHOOSING_ITEM = "choosing"   # the bag is open
+CHOOSING_DETERMINATION = "determination"  # the box is open, asking what
+                                          # determination turns out to mean
 CUTSCENE = "cutscene"        # the gun has come out; the screen is not ours
-DODGING = "dodging"          # mercy was offered; the box has the screen instead
+DODGING = "dodging"          # you stood your ground; the box has the screen
 RESOLVING = "resolving"
 ENEMY_TURN = "enemy"
 VICTORY = "victory"
@@ -18,10 +20,38 @@ DEFEAT = "defeat"
 
 # the states that sit and wait on the player, or on something being watched,
 # rather than on the clock
-WAITING = (PLAYER_TURN, TARGETING, CHOOSING_ITEM, CUTSCENE, DODGING)
+WAITING = (
+    PLAYER_TURN, TARGETING, CHOOSING_ITEM, CHOOSING_DETERMINATION, CUTSCENE,
+    DODGING,
+)
 
 STARTING_ITEMS = 3
 BEAT = 0.8  # seconds a result message stays up before the next actor moves
+
+# What DETERMINATION turns out to mean, once you have picked it. Standing
+# there and sparing them is the dare the box was built for; running is the
+# other thing you could do with a turn, and it is worth finding out what it
+# costs.
+SPARE = "spare"
+FLEE = "flee"
+DETERMINATION_ORDER = (SPARE, FLEE)
+DETERMINATION_LABELS = {SPARE: "Spare", FLEE: "Flee"}
+
+# What the box says while it is asking. You are the one digging in, so you
+# are the one talking, and it is your face in the margin. It is not an offer
+# any more - nothing here is being held out to the HEADs - it is you deciding
+# out loud that you are still in the file when this is over.
+DETERMINATION_LINES = (
+    "* You set your feet and stop giving ground.",
+    '* "Not this hunk. Not this file. Not today."',
+)
+DETERMINATION_LOW = 0.25  # at or under this share of your health the box
+                          # stops saying what you do and starts saying what
+                          # you tell yourself
+DETERMINATION_LINES_LOW = (
+    "* Please don't give up.",
+    "* Stay Determined!",
+)
 
 
 class Battle:
@@ -32,13 +62,13 @@ class Battle:
         items=STARTING_ITEMS,
         base=BASE,
         fizzle=GUARD_FIZZLE,
-        mercy_at=MERCY_AT,
+        determination_at=DETERMINATION_AT,
     ):
         self.player = player
         self.enemies = enemies
         self.stock = {HEALTH: items, GUN: GUN_STOCK}
         self.fizzle = fizzle
-        self.mercy_at = mercy_at
+        self.determination_at = determination_at
         self.item_heal = max(1, round(base * ITEM_HEAL))
         self.state = PLAYER_TURN
         self.message = "Arrows + Enter: command. A: autobattle."
@@ -48,6 +78,8 @@ class Battle:
         self._queue = []
         self._target = None  # the HEAD the cursor is sitting on
         self._item = 0       # which row of the bag is picked
+        self.items_used = 0  # counted up so the screen can flash on each use
+        self._determination = 0      # and which way out of the box is picked
         if not self.living_enemies:
             self.state = VICTORY
             self.message = "Nothing to fight."
@@ -92,22 +124,27 @@ class Battle:
         return self.state == CUTSCENE
 
     @property
-    def mercy_ready(self):
-        """True once you are hurt enough to be allowed to offer mercy.
+    def determination_ready(self):
+        """True once you are hurt enough to be allowed to offer determination.
 
-        Mercy is what you reach for when the fight is already going badly, so
+        Determination is what you reach for when the fight is already going badly, so
         the box will not open while you are still standing comfortably.
         """
-        return self.player.health <= self.player.max_health * self.mercy_at
+        return self.player.health <= self.player.max_health * self.determination_at
 
     @property
     def locked(self):
         """The commands the wheel should draw greyed out, as things stand."""
-        return () if self.mercy_ready else (MERCY,)
+        return () if self.determination_ready else (DETERMINATION,)
+
+    @property
+    def choosing_determination(self):
+        """True while the determination box is open and waiting on Spare or Flee."""
+        return self.state == CHOOSING_DETERMINATION
 
     @property
     def dodging(self):
-        """True while the mercy box owns the screen."""
+        """True while the determination box owns the screen."""
         return self.state == DODGING
 
     @property
@@ -161,25 +198,28 @@ class Battle:
             # to the cursor, and the swing waits on a target
             self._target = self.target
             self.state = TARGETING
-            self.message = "Pick a HEAD - arrows move, Enter strikes."
+            self.message = "Pick a HEAD - arrows move, Enter strikes, X backs out."
             return
 
         elif action == GUARD:
             self.player.guard()
             self.message = "Guarding - damage halved, and blows can glance off."
 
-        elif action == MERCY:
-            if not self.mercy_ready:
+        elif action == DETERMINATION:
+            if not self.determination_ready:
                 self.message = (
-                    f"MERCY opens at {round(self.mercy_at * 100)}% HP - "
+                    f"DETERMINATION opens at "
+                    f"{round(self.determination_at * 100)}% HP - "
                     "you are not hurt enough yet."
                 )
                 return  # a wasted press does not cost the turn
-            # mercy is not a turn so much as a dare: the HEADs answer it all at
-            # once, and the box holds the screen until the wave is out
-            self.state = DODGING
-            self.message = f"{self.player.name} offers mercy. The HEADs answer."
-            self._first_turn = False
+            # picking DETERMINATION does not cost the turn either: it opens the box,
+            # and what determination turns out to mean is a second question
+            self._determination = 0
+            self.state = CHOOSING_DETERMINATION
+            self.message = (
+                "Spare them, or run - arrows pick, Enter confirms, X backs out."
+            )
             return
 
         elif action == ITEM:
@@ -188,7 +228,7 @@ class Battle:
                 return  # a wasted press does not cost the turn
             # like ATTACK, opening the bag is free: what is taken out costs
             self.state = CHOOSING_ITEM
-            self.message = "Open the bag - arrows move, Enter uses."
+            self.message = "Open the bag - arrows move, Enter uses, X backs out."
             return
 
         else:
@@ -262,6 +302,7 @@ class Battle:
             self.message = f"No {LABELS[name]} left."
             return
         self.stock[name] -= 1
+        self.items_used += 1
         self._first_turn = False
 
         if name == GUN:
@@ -274,6 +315,60 @@ class Battle:
         self.message = f"Used HEALTH - healed {self.item_heal} HP."
         self._begin(RESOLVING)
 
+    # ----------------------------------------------------------------- determination
+
+    @property
+    def determination_index(self):
+        """Which way out of the box is picked - what the soul sits in front of."""
+        return self._determination
+
+    @property
+    def determination_option(self):
+        return DETERMINATION_ORDER[self._determination]
+
+    @property
+    def determination_labels(self):
+        """The choices as the box spells them out, in the order it lays them."""
+        return [DETERMINATION_LABELS[name] for name in DETERMINATION_ORDER]
+
+    @property
+    def determination_lines(self):
+        """What the box has to say while it asks - which depends on the state you are in."""
+        if self.player.health <= self.player.max_health * DETERMINATION_LOW:
+            return DETERMINATION_LINES_LOW
+        return DETERMINATION_LINES
+
+    def move_determination(self, step):
+        """Walk the pick `step` places along the choices, wrapping round."""
+        if not self.choosing_determination:
+            return
+        self._determination = (self._determination + step) % len(DETERMINATION_ORDER)
+
+    def cancel_determination(self):
+        """Shut the box; the turn has not been spent."""
+        if not self.choosing_determination:
+            return
+        self.state = PLAYER_TURN
+        self.message = "Arrows pick a command, Enter confirms."
+
+    def confirm_determination(self):
+        """Take the pick. Either way the turn is spent on it."""
+        if not self.choosing_determination:
+            return
+        self._first_turn = False
+
+        if self.determination_option == FLEE:
+            # there is no running from a formation that has already surrounded
+            # you: the turn goes on finding that out, and they get their round
+            self.message = f"{self.player.name} runs - the HEADs close the gap."
+            self._begin(RESOLVING)
+            return
+
+        # determination is not a turn so much as a dare: the HEADs answer it all at
+        # once, and the box holds the screen until the wave is out
+        self.state = DODGING
+        self.message = f"{self.player.name} stands their ground. The HEADs answer."
+
     def finish_cutscene(self):
         """The shot has gone off. There is no round after it."""
         if not self.watching_cutscene:
@@ -284,6 +379,11 @@ class Battle:
 
     def finish_dodge(self, survived, taken=0):
         """The wave is out. Living through it buys the turn straight back.
+
+        It buys back the HP too, all of it: the wave is the hardest thing in
+        the fight and it is offered at half health or less, so what you get
+        for not being hit for a whole round is a whole bar. That is also what
+        makes it worth the risk of walking into one on purpose.
 
         The wave was the HEADs' round: one that the guard put on its back
         spent it getting up, and the guard itself is spent along with it.
@@ -299,12 +399,15 @@ class Battle:
             if enemy.recovering:
                 enemy.recover()
         self.player.guarding = False
+        back = self.player.max_health - self.player.health
+        self.player.heal(self.player.max_health)
         self.state = PLAYER_TURN
-        self.message = (
-            "Not a scratch - your move."
-            if not taken
-            else f"Through it, {taken} HP down - your move."
-        )
+        if not back:
+            self.message = "Not a scratch - your move."
+        elif taken:
+            self.message = f"Through it, {taken} HP down - and all {back} back."
+        else:
+            self.message = f"Not a scratch - and all {back} HP back."
 
     def update(self, dt):
         """Drive the non-interactive parts of the turn on a timer."""

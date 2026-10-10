@@ -1,4 +1,4 @@
-"""The JRPG command ring: ATTACK, GUARD, ITEM, MERCY.
+"""The JRPG command ring: ATTACK, GUARD, ITEM, DETERMINATION.
 
 A blue wheel with a lettered button per command and the name spelled out
 beside it. The selected slot never moves: picking a command turns the whole
@@ -15,7 +15,7 @@ import pygame
 ATTACK = "attack"
 GUARD = "guard"
 ITEM = "item"
-MERCY = "mercy"
+DETERMINATION = "determination"
 
 RING_COLOR = (42, 96, 232)
 RING_EDGE = (150, 200, 255)
@@ -60,7 +60,7 @@ class CommandMenu:
             Command(ATTACK, "ATTACK", "A", (1, 0), "right"),
             Command(GUARD, "GUARD", "B", (0, 1), "right"),
             Command(ITEM, "ITEM", "Y", (-1, 0), "left"),
-            Command(MERCY, "MERCY", "X", (0, -1), "left"),
+            Command(DETERMINATION, "DETERMINATION", "X", (0, -1), "left"),
         ]
         self.index = 0
         self.elapsed = 0.0  # drives the pulsing

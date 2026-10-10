@@ -1,7 +1,7 @@
-"""MERCY: the battle stops being a battle and becomes Undertale.
+"""DETERMINATION: the battle stops being a battle and becomes Undertale.
 
-Offer the HEADs mercy and they answer the only way they know how. The field,
-the wheel and the HUD all drop away, and what is left is a white box with a
+Dig your heels in and the HEADs answer the only way they know how. The
+field, the wheel and the HUD all drop away, and what is left is a white box with a
 red heart in it: the arrows drive the heart, nothing else does anything, and
 the bones come in waves until the wave is out. Nothing you can do touches
 them - the whole turn is spent not being hit.
@@ -18,6 +18,7 @@ import pygame
 
 import assets
 import glass
+import textbox
 
 BACKDROP = (0, 0, 0)
 BOX_LINE = (255, 255, 255)  # the box is one white rule on black, like Undertale's
@@ -31,9 +32,9 @@ TEXT = (255, 255, 255)
 CRACK_GLASS = (198, 228, 255)  # the same blue-white the gun breaks the screen in
 
 OPEN = 0.40      # seconds the box takes to open out of nothing
-WAVE = 4.0       # seconds the wave runs, before the share each HEAD adds
-PER_HEAD = 1.3
-WAVE_CAP = 10.0  # however big the formation, the turn has to end some time
+WAVE = 5.0       # seconds the wave runs, before the share each HEAD adds
+PER_HEAD = 1.7
+WAVE_CAP = 13.0  # however big the formation, the turn has to end some time
 CLOSE = 0.55     # the beat after the last volley, with what is up still live
 
 BOX = (380, 300)     # how big the box is...
@@ -44,19 +45,88 @@ TIMER_WIDTH = 4      # the line along the top of the box that drains with the wa
 
 SOUL_SIZE = 11   # half-height of the heart as it is drawn
 SOUL_HIT = 6     # and the half-width of it that can actually be hit
-SOUL_SPEED = 250  # pixels a second it moves at
+SOUL_SPEED = 285  # pixels a second it moves at
 GRACE = 0.85     # seconds nothing can touch you for after a hit
 FLICKER = 14     # how fast the heart blinks over those seconds
 
 BONE_WIDTH = 13     # how thick a bone is across the short way
-BONE_SPEED = 215
+BONE_SPEED = 260
 PELLET = 10         # across, for the aimed shots
-PELLET_SPEED = 190
-TELL = 0.42         # seconds an aimed shot hangs there as a warning first
-VOLLEY = 1.15       # seconds between volleys at the top of the wave...
-VOLLEY_TIGHT = 0.55  # ...and what that closes to by the end of it
+PELLET_SPEED = 225
+TELL = 0.38         # seconds an aimed shot hangs there as a warning first
+VOLLEY = 0.95       # seconds between volleys at the top of the wave...
+VOLLEY_TIGHT = 0.44  # ...and what that closes to by the end of it
 LANES = 6           # columns a falling volley is split into
 ROWS = 5            # and rows a sweeping one is
+
+# The walls, which are where this stops being a warm-up: a rank of bone the
+# depth of the box with one slot in it to be lined up with, and a blue one
+# with no slot at all - because a blue bone only bites what moves, so the way
+# through it is to take your hands off the arrows and let it pass.
+BLUE = (100, 190, 255)
+WALL_WIDTH = 17
+WALL_GAP = 80         # the slot left in a white wall, in pixels
+WALL_SPEED = 290
+BLUE_WALL_WIDTH = 26
+BLUE_WALL_SPEED = 300
+BLUE_LEAD = 0.9       # how far outside the box a blue wall starts, in box widths
+BLUE_CLEAR = 0.25     # seconds after a blue wall is through before anything else
+WALL_CLEAR = 0.6      # the share of a white wall's crossing it gets to itself
+
+# The skulls. They do not travel: they line up on the row or the column you
+# are standing in, charge where you can see them charging, and then the beam
+# is simply on. The charge is the whole attack - once it is firing there is
+# nothing to do about it but already be somewhere else.
+BLASTER_TELL = 0.55  # seconds the skull hangs there before it fires
+BLASTER_CLEAR = 0.2  # and the beat after that before anything else arrives
+BEAM_TIME = 0.55     # and how long the beam is up for
+BEAM_WIDTH = 40
+BEAM_OVER = 60       # how far past the far side of the box the beam carries
+BEAM_CORE = (255, 255, 255)
+BEAM_EDGE = (185, 215, 255)
+SKULL = (62, 46)     # how big the head is drawn, pointing right
+SKULL_GAP = 44       # how far outside the box it sits
+SKULL_RUSH = 0.55    # how small it arrives, against how big it ends up
+
+# How far into the wave each tier of this is allowed to start. The opening is
+# bones; the skulls and the walls are what it turns into.
+HARDER_AT = 0.3   # the share of the wave the skulls come out after...
+HARDEST_AT = 0.5  # ...and the share the blue walls do
+
+LOW_HP = 40          # at or under this the box stops narrating and starts talking
+DETERMINED = (255, 240, 170)  # the warm off-white those lines are said in
+MURMUR_LINE = 1.15   # seconds before the next line of one comes up
+MURMUR_FADE = 0.55   # seconds a line takes to arrive
+MURMUR_PULSE = 2.6   # radians a second the whole thing breathes at
+MURMUR_FLOOR = 0.60  # the dimmest that breath takes it
+
+# What the box finds to say when there is almost nothing left. One of these
+# comes up, a line at a time, and it is all the box says for the rest of the
+# wave - the HEADs stop being the thing worth narrating.
+MONOLOGUE = (
+    (
+        "* Despite everything, it's still you.",
+        "* Knees going. Still standing.",
+    ),
+    (
+        "* The heart is cracked right through.",
+        "* It is still the only one you have.",
+        "* So hold it. The wave ends.",
+    ),
+    (
+        "* You are running on fumes and spite.",
+        "* Mostly spite.",
+    ),
+    (
+        "* Somewhere someone is still sure you make it.",
+        "* That someone is you.",
+        "* Don't make a liar of yourself.",
+    ),
+    (
+        "* One more. You only have to not be hit.",
+        "* You have been doing it all along.",
+    ),
+)
 
 BREAK_HOLD = 0.55  # seconds the cracked heart hangs there before it gives
 BREAK_FALL = 1.25  # and how long the pieces take to fall out of the screen
@@ -110,17 +180,29 @@ class Shot:
     outside the box need no warning: you watch them arrive.
     """
 
-    def __init__(self, spot, drift, size, tell=0.0, pellet=False):
+    def __init__(self, spot, drift, size, tell=0.0, pellet=False, blue=False):
         self.spot = pygame.Vector2(spot)
         self.drift = pygame.Vector2(drift)
         self.size = size
         self.tell = tell
         self.pellet = pellet
+        self.blue = blue  # a blue one only bites what moves
 
     @property
     def live(self):
         """False while it is still only a warning, and cannot hit anything."""
         return self.tell <= 0
+
+    stays = False  # a bone travels, so it is always on its way off the board
+
+    @property
+    def gone(self):
+        """A bone is spent by leaving the screen and by nothing else."""
+        return False
+
+    def hurts(self, moving):
+        """Whether it can take HP off as things stand."""
+        return self.live and (not self.blue or moving)
 
     @property
     def rect(self):
@@ -142,10 +224,11 @@ class Shot:
             else:
                 pygame.draw.rect(surface, TELL_LINE, rect, 2)
             return
+        color = BLUE if self.blue else BONE
         if self.pellet:
-            pygame.draw.circle(surface, BONE, self.spot, self.size[0] / 2)
+            pygame.draw.circle(surface, color, self.spot, self.size[0] / 2)
             return
-        pygame.draw.rect(surface, BONE, rect)
+        pygame.draw.rect(surface, color, rect)
         # the knobs on the ends, so a bone reads as a bone and not as a bar
         knob = min(self.size) * 0.8
         if self.size[1] >= self.size[0]:
@@ -153,14 +236,140 @@ class Shot:
         else:
             ends = ((rect.left, rect.centery), (rect.right, rect.centery))
         for end in ends:
-            pygame.draw.circle(surface, BONE, end, knob)
+            pygame.draw.circle(surface, color, end, knob)
 
 
-class Mercy:
+class Blaster:
+    """A skull that lines up on a row or a column, charges, and fires.
+
+    It is the one thing in here that does not travel. It appears pointed at
+    where you are standing, holds there long enough to be got out of the way
+    of, and then the beam is on across the whole box for a beat. The charge
+    is the warning and the only one there is.
+    """
+
+    stays = True  # it does not travel, so it is still there in a moment
+
+    def __init__(self, box, across, where, from_low=True, tell=BLASTER_TELL):
+        self.box = pygame.Rect(box)
+        self.across = across    # True for a beam along a row, False down a column
+        self.where = where      # the row, or the column, it is lined up on
+        self.from_low = from_low  # which end of that line the skull sits at
+        self.tell = tell
+        self.burn = BEAM_TIME
+        self.blue = False
+
+    @property
+    def live(self):
+        return self.tell <= 0 and self.burn > 0
+
+    @property
+    def gone(self):
+        """Spent once the beam has burnt out; it has nowhere to travel to."""
+        return self.burn <= 0
+
+    @property
+    def thickness(self):
+        """How deep the beam is right now - it thins out as it dies."""
+        if self.tell > 0:
+            return BEAM_WIDTH
+        return BEAM_WIDTH * min(1.0, self.burn / BEAM_TIME * 2.2)
+
+    def span(self):
+        """The two ends of the beam: the muzzle, and just past the far side."""
+        if self.across:
+            near = self.muzzle()[0]
+            far = self.box.right + BEAM_OVER if self.from_low else self.box.left - BEAM_OVER
+        else:
+            near = self.muzzle()[1]
+            far = self.box.bottom + BEAM_OVER if self.from_low else self.box.top - BEAM_OVER
+        return (min(near, far), max(near, far))
+
+    def along(self, deep):
+        """The beam's rectangle at `deep` across: drawn and hit off this one."""
+        start, end = self.span()
+        if self.across:
+            return pygame.Rect(
+                round(start), round(self.where - deep / 2), round(end - start), round(deep)
+            )
+        return pygame.Rect(
+            round(self.where - deep / 2), round(start), round(deep), round(end - start)
+        )
+
+    @property
+    def rect(self):
+        return self.along(max(2, self.thickness))
+
+    def hurts(self, moving):
+        return self.live
+
+    def muzzle(self):
+        """Where the head sits: just outside the box, on the end it fires from."""
+        if self.across:
+            x = self.box.left - SKULL_GAP if self.from_low else self.box.right + SKULL_GAP
+            return (x, self.where)
+        y = self.box.top - SKULL_GAP if self.from_low else self.box.bottom + SKULL_GAP
+        return (self.where, y)
+
+    def advance(self, dt):
+        if self.tell > 0:
+            self.tell -= dt
+            return
+        self.burn -= dt
+
+    def skull(self):
+        """The head, drawn pointing right and then turned to face its beam."""
+        face = pygame.Surface(SKULL, pygame.SRCALPHA)
+        box = pygame.Rect((0, 0), SKULL)
+        cranium = pygame.Rect(0, 0, SKULL[0] * 0.62, SKULL[1])
+        pygame.draw.rect(face, BONE, cranium, border_radius=7)
+        # the snout, tapering out towards whatever it is pointed at
+        pygame.draw.polygon(
+            face,
+            BONE,
+            [
+                (cranium.right - 4, box.top + 5),
+                (box.right, box.centery - 7),
+                (box.right, box.centery + 7),
+                (cranium.right - 4, box.bottom - 5),
+            ],
+        )
+        for eye in (box.centery - 8, box.centery + 8):
+            pygame.draw.rect(face, BACKDROP, (6, eye - 4, 11, 8), border_radius=2)
+        pygame.draw.rect(face, BACKDROP, (cranium.right - 3, box.centery - 5, 4, 10))
+        turn = 0 if self.from_low else 180
+        if not self.across:
+            turn = -90 if self.from_low else 90
+        return pygame.transform.rotate(face, turn)
+
+    def draw(self, surface):
+        """The beam first and the head over it, so the head is never inside it."""
+        head = self.skull()
+        if self.tell > 0:
+            # the line it is lined up on, drawn the way every other warning in
+            # here is drawn: hollow, and in the grey that means not yet
+            pygame.draw.rect(surface, TELL_LINE, self.along(2))
+            # and the head comes in small and settles at full size, so the
+            # charge is a thing arriving rather than a thing sitting there
+            grown = SKULL_RUSH + (1 - SKULL_RUSH) * (1 - self.tell / BLASTER_TELL)
+            head = pygame.transform.rotozoom(head, 0, grown)
+        else:
+            beam = self.rect
+            pygame.draw.rect(surface, BEAM_EDGE, beam)
+            core = (
+                beam.inflate(0, -round(beam.height * 0.45))
+                if self.across
+                else beam.inflate(-round(beam.width * 0.45), 0)
+            )
+            pygame.draw.rect(surface, BEAM_CORE, core)
+        surface.blit(head, head.get_rect(center=self.muzzle()))
+
+
+class Determination:
     """The dodging box. `begin` a wave, advance it every frame, read `done`.
 
-    Unlike the gun this is not a one-shot: MERCY can be picked every turn, so
-    every wave is built fresh and the old one is thrown away with it.
+    Unlike the gun this is not a one-shot: DETERMINATION can be picked
+    every turn, so every wave is built fresh and the old one thrown away.
     """
 
     def __init__(self, width, height):
@@ -187,9 +396,12 @@ class Mercy:
         self.survived = True
         self.rolls = random.Random()
         self.heart = pygame.Vector2(self.box().center)
+        self.moving = False  # whether the arrows are being held this frame
         self.grace = 0.0
         self.wait = TELL + 0.3  # the first volley does not arrive instantly
         self.last = None        # the pattern that came up last, so none repeats
+        self.murmur = None      # the low-HP lines, once the HP has got that low
+        self.murmured = 0.0     # and how long they have been up, in seconds
         self.length = min(WAVE_CAP, WAVE + PER_HEAD * len(living))
         # a bone bites for what the average HEAD swings for, so the wave is
         # as dangerous as the formation it came out of
@@ -210,7 +422,7 @@ class Mercy:
 
     @property
     def covering(self):
-        """True while MERCY owns the whole screen.
+        """True while DETERMINATION owns the whole screen.
 
         It lets go for the last beat of all: the battle is drawn again
         underneath and the black falls off it in panes.
@@ -250,6 +462,7 @@ class Mercy:
         if not self.live:
             return
         self.beat += dt
+        self.listen(dt)
 
         if self.phase == OPENING:
             if self.beat >= OPEN:
@@ -271,12 +484,29 @@ class Mercy:
             if self.beat >= BLACK + CRACK + FALL:
                 self.step(OVER)
 
+    def listen(self, dt):
+        """Keep the low-HP lines on their own clock, which the phases don't reset.
+
+        They start the moment the HP is low enough - picked once, and kept for
+        the rest of the wave however the wave goes.
+        """
+        if self.phase not in (OPENING, DODGING) or not self.player.alive:
+            return
+        if self.player.health > LOW_HP:
+            return
+        if self.murmur is None:
+            self.murmur = self.rolls.choice(MONOLOGUE)
+        self.murmured += dt
+
     def drive(self, keys, dt):
         """The arrows move the heart, and the box is as far as it goes."""
         move = pygame.Vector2(
             held(keys, RIGHT) - held(keys, LEFT),
             held(keys, DOWN) - held(keys, UP),
         )
+        # the blue bones read the keys rather than the position, so pinned
+        # against the edge of the box with an arrow down still counts
+        self.moving = bool(move.length_squared())
         if move.length_squared():
             self.heart += move.normalize() * SOUL_SPEED * dt
         inside = self.box().inflate(-SOUL_SIZE * 2, -SOUL_SIZE * 2)
@@ -293,7 +523,17 @@ class Mercy:
         run = self.beat / self.length
         self.wait = VOLLEY + (VOLLEY_TIGHT - VOLLEY) * run
 
+        # what the wave is allowed to throw yet: it opens on bones and turns
+        # into skulls and walls, so the first volley is never the worst one
         patterns = [self.rain, self.sweep, self.closing]
+        if run > HARDER_AT:
+            patterns += [self.wall, self.blasters]
+        # a blue wall asks you to stand still, and everything in the air when
+        # it goes up will have travelled off the board before it arrives -
+        # everything except a skull, which is still sitting there waiting to
+        # fire. So no blue wall while one of those is up.
+        if run > HARDEST_AT and not any(shot.stays for shot in self.shots):
+            patterns.append(self.blue_wall)
         if self.last in patterns and len(patterns) > 1:
             patterns.remove(self.last)  # never the same thing twice running
         self.last = self.rolls.choice(patterns)
@@ -306,10 +546,10 @@ class Mercy:
         live = []
         for shot in self.shots:
             shot.advance(dt)
-            if not reach.colliderect(shot.rect):
-                continue  # gone past the screen; it is nobody's problem now
+            if shot.gone or not reach.colliderect(shot.rect):
+                continue  # spent, or gone past the screen; nobody's problem now
             live.append(shot)
-            if shot.live and not self.grace and shot.rect.colliderect(self.hitbox()):
+            if shot.hurts(self.moving) and not self.grace and shot.rect.colliderect(self.hitbox()):
                 self.wound()
         self.shots = live
 
@@ -394,6 +634,93 @@ class Mercy:
             shots.append(Shot(spot, drift, (PELLET, PELLET), tell=TELL, pellet=True))
         return shots
 
+    def wall(self):
+        """A rank of bone crossing the box with one slot in it.
+
+        It fills the box top to bottom but for the slot, so there is no
+        dodging it on the spot: you line the heart up with the gap and ride
+        it across. It comes in from outside the box, where it is still drawn,
+        which is the only warning it gives and all the warning it needs.
+        """
+        box = self.box()
+        from_left = self.rolls.random() < 0.5
+        gap = self.rolls.uniform(box.top + WALL_GAP, box.bottom - WALL_GAP)
+        start = box.left - WALL_WIDTH * 3 if from_left else box.right + WALL_WIDTH * 3
+        speed = WALL_SPEED if from_left else -WALL_SPEED
+        # a wall is a thing you ride across rather than step around, so it is
+        # given most of its crossing to itself before the next volley lands
+        self.wait = max(self.wait, box.width / WALL_SPEED * WALL_CLEAR)
+        bones = []
+        for top, bottom in (
+            (box.top, gap - WALL_GAP / 2),
+            (gap + WALL_GAP / 2, box.bottom),
+        ):
+            bones.append(
+                Shot(
+                    (start, (top + bottom) / 2),
+                    (speed, 0),
+                    (WALL_WIDTH, bottom - top),
+                )
+            )
+        return bones
+
+    def blue_wall(self):
+        """The same wall with no slot in it at all, in blue.
+
+        There is nowhere to put the heart, so the answer is not to put it
+        anywhere: a blue bone only bites what moves, and the wall passes
+        straight through a heart that is holding still.
+        """
+        box = self.box()
+        from_left = self.rolls.random() < 0.5
+        lead = box.width * BLUE_LEAD
+        start = box.left - lead if from_left else box.right + lead
+        speed = BLUE_WALL_SPEED if from_left else -BLUE_WALL_SPEED
+        # it starts well outside the box and nothing else comes while it is
+        # on its way or crossing: a wall you have to stand still for is only
+        # fair if standing still is enough, which means the board in front of
+        # it has to be empty by the time it arrives
+        self.wait = max(self.wait, (lead + box.width) / BLUE_WALL_SPEED + BLUE_CLEAR)
+        return [
+            Shot(
+                (start, box.centery),
+                (speed, 0),
+                (BLUE_WALL_WIDTH, box.height),
+                blue=True,
+            )
+        ]
+
+    def blasters(self):
+        """One or two skulls, the first of them aimed at where you are now.
+
+        The aim is taken when they appear and they do not follow you, so the
+        charge is long enough to simply walk out of - which is the pattern:
+        you are being asked to stop standing still, having just been asked to
+        stand still.
+        """
+        box = self.box()
+        shots = []
+        # the charge is the dodge: nothing else arrives during it
+        self.wait = max(self.wait, BLASTER_TELL + BLASTER_CLEAR)
+        for i in range(self.rolls.randint(1, 2)):
+            across = self.rolls.random() < 0.5
+            if i == 0:
+                where = self.heart.y if across else self.heart.x
+            elif across:
+                where = self.rolls.uniform(box.top + BEAM_WIDTH, box.bottom - BEAM_WIDTH)
+            else:
+                where = self.rolls.uniform(box.left + BEAM_WIDTH, box.right - BEAM_WIDTH)
+            shots.append(
+                Blaster(
+                    box,
+                    across,
+                    round(where),
+                    from_low=self.rolls.random() < 0.5,
+                    tell=BLASTER_TELL + 0.12 * i,  # the second one lands behind the first
+                )
+            )
+        return shots
+
     # --------------------------------------------------------------- drawing
 
     def draw(self, surface):
@@ -452,20 +779,10 @@ class Mercy:
         )
 
     def draw_soul(self, surface, spot, size=SOUL_SIZE, color=SOUL):
-        """The heart: two lobes and a point, the way a soul is drawn."""
+        """The heart, drawn where it is - the same one the text box picks with."""
         if self.grace and int(self.grace * FLICKER) % 2:
             return  # the flicker after a hit: it blinks out and back
-        pygame.draw.circle(surface, color, (spot.x - size * 0.46, spot.y - size * 0.3), size * 0.54)
-        pygame.draw.circle(surface, color, (spot.x + size * 0.46, spot.y - size * 0.3), size * 0.54)
-        pygame.draw.polygon(
-            surface,
-            color,
-            [
-                (spot.x - size * 0.95, spot.y - size * 0.18),
-                (spot.x + size * 0.95, spot.y - size * 0.18),
-                (spot.x, spot.y + size),
-            ],
-        )
+        textbox.draw_soul(surface, spot, size, color)
 
     def draw_hp(self, surface):
         """The HP strip under the box, counted the way the box counts it."""
@@ -489,14 +806,43 @@ class Mercy:
         )
         surface.blit(count, count.get_rect(midleft=(bar.right + 10, middle)))
 
+    @property
+    def blue_up(self):
+        """True while something that only bites movement is on the board."""
+        return any(shot.blue and shot.live for shot in self.shots)
+
     def draw_lines(self, surface):
         """What the box has to say, in the asterisks it says everything in."""
         font = assets.font(24)
+        if self.blue_up:
+            # this one jumps the queue, low HP or not: being hit by a rule
+            # nobody told you about is the only unfair thing in here
+            surface.blit(
+                font.render("* Blue bones only bite what moves.", True, BLUE), (40, 36)
+            )
+            return
+        if self.murmur is not None:
+            self.draw_murmur(surface, font)
+            return
         said = ["* The HEADs answer."]
         if self.phase == OPENING or self.beat < 2.4:
             said.append("* Arrows move the heart. Nothing else moves.")
         for i, line in enumerate(said):
             surface.blit(font.render(line, True, TEXT), (40, 36 + i * 28))
+
+    def draw_murmur(self, surface, font):
+        """The low lines, arriving one by one and breathing like something alive."""
+        breath = MURMUR_FLOOR + (1 - MURMUR_FLOOR) * (
+            0.5 + 0.5 * math.sin(self.murmured * MURMUR_PULSE)
+        )
+        for i, line in enumerate(self.murmur):
+            since = self.murmured - i * MURMUR_LINE
+            if since <= 0:
+                break  # it has not got this far yet
+            arrived = min(1.0, since / MURMUR_FADE)
+            text = font.render(line, True, DETERMINED)
+            text.set_alpha(round(255 * arrived * breath))
+            surface.blit(text, (40, 36 + i * 28))
 
     # ------------------------------------------------------- the heart going
 
