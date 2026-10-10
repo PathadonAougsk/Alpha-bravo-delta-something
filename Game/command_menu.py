@@ -24,6 +24,9 @@ BUTTON_EDGE = (235, 242, 255)
 TEXT_COLOR = (255, 255, 255)
 TEXT_SHADOW = (10, 18, 50)
 DIM = (150, 165, 200)
+LOCKED_FILL = (26, 32, 52)    # a command the battle will not let you pick yet
+LOCKED_EDGE = (86, 96, 124)
+LOCKED_TEXT = (104, 114, 142)
 
 PULSE_SPEED = 5.2    # radians a second, for the button that is picked
 PULSE_PIXELS = 2.4   # how much bigger that button swells
@@ -116,7 +119,8 @@ class CommandMenu:
 
     # ----------------------------------------------------------------- drawing
 
-    def draw(self, surface, center):
+    def draw(self, surface, center, locked=()):
+        """Lay the wheel out around `center`, greying out any locked action."""
         if self._font is None:
             self._font = pygame.font.SysFont(None, 42, bold=True, italic=True)
             self._button_font = pygame.font.SysFont(None, 24, bold=True)
@@ -129,21 +133,26 @@ class CommandMenu:
             command = self.commands[i]
             angle = self.angle_of(i)
             selected = i == self.index
+            shut = command.action in locked
             heading = pygame.Vector2(1, 0).rotate(angle)
             button_pos = center + heading * self.BUTTON_OFFSET
             radius = self.BUTTON_RADIUS + (self.pulse * PULSE_PIXELS if selected else 0)
-            pygame.draw.circle(surface, BUTTON_FILL, button_pos, radius)
+            pygame.draw.circle(
+                surface, LOCKED_FILL if shut else BUTTON_FILL, button_pos, radius
+            )
             pygame.draw.circle(
                 surface,
-                BUTTON_EDGE if selected else DIM,
+                LOCKED_EDGE if shut else (BUTTON_EDGE if selected else DIM),
                 button_pos,
                 radius,
                 3 if selected else 2,
             )
-            glyph = self._button_font.render(command.button, True, BUTTON_EDGE)
+            glyph = self._button_font.render(
+                command.button, True, LOCKED_EDGE if shut else BUTTON_EDGE
+            )
             surface.blit(glyph, glyph.get_rect(center=button_pos))
 
-            self._draw_label(surface, center, command, heading, angle, selected)
+            self._draw_label(surface, center, command, heading, angle, selected, shut)
 
     def _draw_ring(self, surface, center):
         size = self.RADIUS * 2 + 8
@@ -165,9 +174,9 @@ class CommandMenu:
             )
         surface.blit(ring, ring.get_rect(center=center))
 
-    def _draw_label(self, surface, center, command, heading, angle, selected):
+    def _draw_label(self, surface, center, command, heading, angle, selected, shut=False):
         """The name, out past its button and turned to match the wheel."""
-        color = TEXT_COLOR if selected else DIM
+        color = LOCKED_TEXT if shut else (TEXT_COLOR if selected else DIM)
         text = self._font.render(command.label, True, color)
         shadow = self._font.render(command.label, True, TEXT_SHADOW)
 

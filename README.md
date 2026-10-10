@@ -65,9 +65,83 @@ hunk for a battle to decide.
 
 Arrow keys pick a command on the ring, Enter confirms:
 
-- **ATTACK** - hit the targeted HEAD for your attack damage.
-- **GUARD** - halve the damage you take for the coming round.
+- **ATTACK** - pick a HEAD, then hit it for your attack damage. Choosing
+  ATTACK hands the arrows to a cursor on the field rather than spending the
+  turn: an orange diamond floats over whoever is picked, left and right walk
+  it along the living HEADs, Enter swings and Backspace puts it away.
+- **GUARD** - halve the damage you take for the coming round, and give every
+  swing that comes in a `GUARD_FIZZLE` (40%) chance of failing outright.
 - **ITEM** - heal; you start with three.
+- **MERCY** - only once you are down to half HP or less. Offer it and the
+  fight stops being a fight: the screen turns into Undertale, a white box with
+  a red heart in it, and a wave of bones you have to dodge with nothing but
+  the arrows. Survive it and the turn comes straight back to you; don't, and
+  the heart breaks.
+
+Every hit that lands puts the number it took off up over the body it came
+off, floating up and fading as it goes - the guarded half included, so a
+halved blow shows the halved number.
+
+A HEAD whose attack fails against the guard lands on its side: it is drawn
+rotated a quarter turn and washed blue, and its next turn goes on picking
+itself back up rather than on hitting you. So a guard that catches a swing
+costs that HEAD two turns, not one - which is what makes guarding worth a
+turn against a HEAD that outweighs you.
+
+### MERCY
+
+MERCY is a last resort rather than an opening move, so the wheel will not
+take it while you are still standing comfortably: it opens at `MERCY_AT` (50%)
+of your health and stays shut above that. A shut command is drawn greyed out -
+sunken button, grey label, even when it is the one picked - and pressing Enter
+on it says what it is waiting for and costs you nothing. It lights up by
+itself the moment a HEAD takes you under half, which is also the moment it
+stops being a stunt: the wave bites with the HEADs' real damage against
+whatever HP you have left.
+
+Picking MERCY hands the whole screen to a dodging game. The field, the wheel
+and the HUD drop away and what is left is a white rule on black with a red
+heart sitting in the middle of it - the soul - with the HP counted off
+underneath in Undertale's yellow. The arrows move the heart and nothing else
+does anything at all: there is no attacking your way out of the wave, and the
+turn is spent not being hit.
+
+Three things come at you, on a cadence that tightens as the wave runs: bones
+dropping in through the roof with a column left open, a rank of them sliding
+in from one side with a row to slip through, and pellets that appear hollow
+around the rim, take their aim at wherever the heart is standing, and then
+come. The hollow ones are the only warning anything gives, which is the whole
+pattern: the aim is taken when they appear, so the warning is long enough to
+walk out of. Shots are drawn for a run-up outside the box as well as inside
+it, so nothing arrives unseen, and the line along the top of the box drains
+with the wave, so you can see how much of the turn is left.
+
+A bone that gets through bites for what the average HEAD swings for, and
+leaves the heart flickering and untouchable for a beat afterwards. Both
+numbers are the battle's real ones: the wave is as dangerous as the formation
+that threw it, and the HP it takes off is HP you do not have for the rest of
+the fight. The heart's hitbox is smaller than the heart is drawn, the way it
+ought to be.
+
+Run out of HP in there and everything stops: the box goes out from under the
+heart, a crack opens down it, it hangs there for a beat and then bursts into
+pieces that arc up and fall out of the screen - and that is the game over,
+straight into the DEFEAT splash.
+
+Live through the wave instead and the screen goes black, cracks run out from
+the middle of it, and the black comes apart into panes that turn over as they
+fall away, leaving the battle exactly where you left it - the field, the
+HEADs, the HUD and the message - except that it is your turn again. The wave
+was the HEADs' round: they have had their swing, so a HEAD the guard put on
+its back spends that round getting up, and the guard is spent with it. The
+cracking and the panes are the same glass the gun breaks the screen with; it
+lives in `glass.py` and both of them hand it the point the blow landed on.
+
+The battle runs at 12 frames a second, which is the retro look working as
+intended and is no way to dodge anything, so the loop ticks at `MERCY_FPS`
+(48) for as long as the box is up and drops back to 12 the moment it lets go.
+Everything in the game is driven off elapsed time rather than frames, so
+nothing else notices.
 
 The ring is a wheel, and the selected slot is fixed: picking a command turns
 the whole wheel until that command arrives there, rather than moving a
@@ -75,7 +149,9 @@ highlight around a standing ring. Every label rides around with it and tilts
 as it goes, so neighbours read at `SPACING` degrees (45) and the far one at
 90, while whatever is picked is always the upright one. Each arrow still
 chooses its own command outright, so a press is one turn of the wheel, not a
-step around it.
+step around it. With four commands on it the far one sits 135 degrees round,
+where a label would hang over the field upside down, so labels fade out as
+they pass 90 and the back of the wheel carries nothing but its button.
 
 Each battle opens on a black screen that splits across the middle: the two
 halves part on a lit seam to reveal the player behind them, a flat blue cut-out

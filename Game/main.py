@@ -295,7 +295,8 @@ def main(argv=None, title=None):
         if battle.accepting_input:
             # high enough that the wheel can swing a label a quarter turn
             # either way without running off the bottom of the screen
-            menu.draw(frame, (player.pos.x + 120, player.pos.y - 90))
+            # the wheel greys out whatever the battle will not take this turn
+            menu.draw(frame, (player.pos.x + 120, player.pos.y - 90), battle.locked)
         elif battle.choosing_item:
             # the bag opens where the wheel was, so the eye does not have to move
             bag.draw(

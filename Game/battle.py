@@ -4,7 +4,7 @@ import random
 
 from command_menu import ATTACK, GUARD, ITEM, MERCY
 from items import GUN, GUN_STOCK, HEALTH, LABELS, ORDER
-from stats import BASE, GUARD_FIZZLE, ITEM_HEAL
+from stats import BASE, GUARD_FIZZLE, ITEM_HEAL, MERCY_AT
 
 PLAYER_TURN = "player"
 TARGETING = "targeting"      # the cursor is out over the field
@@ -25,11 +25,20 @@ BEAT = 0.8  # seconds a result message stays up before the next actor moves
 
 
 class Battle:
-    def __init__(self, player, enemies, items=STARTING_ITEMS, base=BASE, fizzle=GUARD_FIZZLE):
+    def __init__(
+        self,
+        player,
+        enemies,
+        items=STARTING_ITEMS,
+        base=BASE,
+        fizzle=GUARD_FIZZLE,
+        mercy_at=MERCY_AT,
+    ):
         self.player = player
         self.enemies = enemies
         self.stock = {HEALTH: items, GUN: GUN_STOCK}
         self.fizzle = fizzle
+        self.mercy_at = mercy_at
         self.item_heal = max(1, round(base * ITEM_HEAL))
         self.state = PLAYER_TURN
         self.message = "Arrows pick a command, Enter confirms."
@@ -74,6 +83,20 @@ class Battle:
     def watching_cutscene(self):
         """True while the gun's cut-in owns the screen."""
         return self.state == CUTSCENE
+
+    @property
+    def mercy_ready(self):
+        """True once you are hurt enough to be allowed to offer mercy.
+
+        Mercy is what you reach for when the fight is already going badly, so
+        the box will not open while you are still standing comfortably.
+        """
+        return self.player.health <= self.player.max_health * self.mercy_at
+
+    @property
+    def locked(self):
+        """The commands the wheel should draw greyed out, as things stand."""
+        return () if self.mercy_ready else (MERCY,)
 
     @property
     def dodging(self):
@@ -129,6 +152,12 @@ class Battle:
             self.message = "Guarding - damage halved, and blows can glance off."
 
         elif action == MERCY:
+            if not self.mercy_ready:
+                self.message = (
+                    f"MERCY opens at {round(self.mercy_at * 100)}% HP - "
+                    "you are not hurt enough yet."
+                )
+                return  # a wasted press does not cost the turn
             # mercy is not a turn so much as a dare: the HEADs answer it all at
             # once, and the box holds the screen until the wave is out
             self.state = DODGING

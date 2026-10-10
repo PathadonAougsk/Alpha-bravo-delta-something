@@ -14,6 +14,8 @@ PLAYER = {"health": 2.4, "mana": 1.6, "attack_damage": 0.5}
 ENEMY = {"health": 0.8, "mana": 0.2, "attack_damage": 0.16}
 
 ITEM_HEAL = 0.6  # an item restores 60% of the baseline
+MERCY_AT = 0.5   # the share of your health you have to be down to before MERCY
+                 # will open: it is a last resort, not an opening move
 GUARD_FIZZLE = 0.4  # chance a guarded attack fails outright and costs the
                     # attacker its next turn getting back up
 
