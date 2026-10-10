@@ -171,3 +171,59 @@ minigit log
 
 If `init` prints `Initialized empty minigit repository in .minigit/`,
 the command is wired up correctly.
+
+# Uninstallation
+## macOS / Linux
+
+If you used Option 1 (PATH + ~/bin):
+
+```sh
+rm ~/bin/minigit
+```
+
+The export PATH="$HOME/bin:$PATH" line in ~/.bashrc/~/.zshrc can stay (harmless if the folder’s empty) or you can delete that line too.
+
+If you used Option 2 (alias):
+
+```sh
+sed -i '/alias minigit=/d' ~/.bashrc   # or ~/.zshrc
+source ~/.bashrc
+```
+
+Or just open the file and delete the line manually.
+
+If you used Option 3 (pip/pipx package):
+
+```sh
+pipx uninstall minigit
+# or, if installed with pip:
+pip uninstall minigit
+```
+## Windows
+
+If you used Option 1 (pip package):
+
+```powershell
+pip uninstall minigit
+```
+
+If you used Option 2 (.bat wrapper):
+
+```powershell
+del C:\tools\minigit.bat
+del C:\tools\minigit.py
+```
+
+Then remove C:\tools from PATH if you added it just for this: Environment Variables → edit Path under User variables → select the entry → Remove.
+
+If you used Option 3 (PowerShell function):
+Open your profile with notepad $PROFILE and delete the function minigit { ... } line, then restart PowerShell.
+
+Checking it’s gone (any platform)
+```sh
+minigit
+``
+
+Should give “command not found” (or PowerShell’s equivalent). If it still runs, something’s still on PATH — run which minigit (macOS/Linux) or where.exe minigit (Windows) to find the leftover file.
+
+One more thing worth remembering: none of this touches any .minigit/ folders you created inside actual projects while testing. Those are just local data, so delete them per-project with rm -rf .minigit (or rmdir /s .minigit on Windows) if you want to clean those up too.
