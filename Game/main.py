@@ -142,7 +142,7 @@ def draw_message(surface, font, message, age):
     surface.blit(text, (slide + 12, 13))
 
 
-def main(argv=None, title=None):
+def main(argv=None, title=None, before_close=None):
     """Run a battle. Returns True on a win, False on a loss, None if quit early."""
     args = parse_args(argv)
 
@@ -213,9 +213,12 @@ def main(argv=None, title=None):
                     elif event.key in (pygame.K_BACKSPACE, pygame.K_x):
                         battle.cancel_item()
             elif battle.accepting_input:
-                action = menu.handle_event(event)
-                if action:
-                    battle.player_command(action)
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_a:
+                    battle.autobattle()
+                else:
+                    action = menu.handle_event(event)
+                    if action:
+                        battle.player_command(action)
 
         if intro.running:
             intro.advance(dt)
@@ -307,6 +310,9 @@ def main(argv=None, title=None):
             )
 
         draw_player_bars(frame, font, player, battle.items)
+        if battle.can_autobattle or battle.autobattle_enabled:
+            label = "AUTOBATTLE ACTIVE" if battle.autobattle_enabled else "A: AUTOBATTLE"
+            frame.blit(font.render(label, True, (255, 220, 120)), (12, HEIGHT - 32))
         draw_message(frame, font, battle.message, message_age)
 
         if battle.dodging:
@@ -320,7 +326,11 @@ def main(argv=None, title=None):
         present(screen, frame, retro)
         pygame.display.flip()
 
-    pygame.quit()
+    try:
+        if before_close is not None:
+            before_close()
+    finally:
+        pygame.quit()
     return battle.result
 
 

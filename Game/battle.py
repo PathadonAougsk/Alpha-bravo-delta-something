@@ -41,7 +41,9 @@ class Battle:
         self.mercy_at = mercy_at
         self.item_heal = max(1, round(base * ITEM_HEAL))
         self.state = PLAYER_TURN
-        self.message = "Arrows pick a command, Enter confirms."
+        self.message = "Arrows + Enter: command. A: autobattle."
+        self.autobattle_enabled = False
+        self._first_turn = True
         self.timer = 0.0
         self._queue = []
         self._target = None  # the HEAD the cursor is sitting on
@@ -67,7 +69,12 @@ class Battle:
 
     @property
     def accepting_input(self):
-        return self.state == PLAYER_TURN
+        return self.state == PLAYER_TURN and not self.autobattle_enabled
+
+    @property
+    def can_autobattle(self):
+        """Whether autobattle can still be started on the opening turn."""
+        return self.accepting_input and self._first_turn
 
     @property
     def choosing_target(self):
@@ -132,11 +139,21 @@ class Battle:
 
     # ----------------------------------------------------------------- actions
 
+    def autobattle(self):
+        """Start automatic attacks on the first turn; return whether started."""
+        if not self.can_autobattle:
+            return False
+        self.autobattle_enabled = True
+        self._auto_attack()
+        return True
+
     def player_command(self, action):
         """Run the chosen command. Anything that costs a turn hands over to the enemies."""
         if not self.accepting_input:
             return
+        self._run_player_command(action)
 
+    def _run_player_command(self, action):
         if action == ATTACK:
             if self.target is None:
                 return
@@ -162,6 +179,7 @@ class Battle:
             # once, and the box holds the screen until the wave is out
             self.state = DODGING
             self.message = f"{self.player.name} offers mercy. The HEADs answer."
+            self._first_turn = False
             return
 
         elif action == ITEM:
@@ -176,6 +194,7 @@ class Battle:
         else:
             return
 
+        self._first_turn = False
         self._begin(RESOLVING)
 
     def move_target(self, step):
@@ -200,14 +219,24 @@ class Battle:
         target = self.target
         if target is None:
             return
+        before = target.health
         self.player.attack(target)
+        dealt = before - target.health
         self.message = (
             f"{self.player.name} hits {target.name} "
-            f"for {self.player.attack_damage}!"
+            f"for {dealt}!"
         )
+        if self.player.last_attack_critical:
+            self.message += " Critical hit!"
         if not target.alive:
             self.message += f" {target.name} is down."
+        self._first_turn = False
         self._begin(RESOLVING)
+
+    def _auto_attack(self):
+        """Autobattle's whole turn: put the cursor on a HEAD and swing at it."""
+        self._run_player_command(ATTACK)
+        self.confirm_target()
 
     # ------------------------------------------------------------------- bag
 
@@ -233,6 +262,7 @@ class Battle:
             self.message = f"No {LABELS[name]} left."
             return
         self.stock[name] -= 1
+        self._first_turn = False
 
         if name == GUN:
             # nothing else happens this turn, or any turn after it
@@ -278,7 +308,12 @@ class Battle:
 
     def update(self, dt):
         """Drive the non-interactive parts of the turn on a timer."""
-        if self.over or self.state in WAITING:
+        if self.over:
+            return
+        if self.state == PLAYER_TURN and self.autobattle_enabled:
+            self._auto_attack()
+            return
+        if self.state in WAITING:
             return
 
         self.timer -= dt
@@ -324,9 +359,11 @@ class Battle:
             enemy.attack(self.player)
             dealt = before - self.player.health
             self.message = f"{enemy.name} hits {self.player.name} for {dealt}!"
+            if enemy.last_attack_critical:
+                self.message += " Critical hit!"
             if not self.player.alive:
                 self.state = DEFEAT
-                self.message = f"{enemy.name} finishes {self.player.name} off - DEFEAT."
+                self.message += f" {self.player.name} is down - DEFEAT."
                 return
             self._begin(ENEMY_TURN)
             return
