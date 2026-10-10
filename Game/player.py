@@ -63,6 +63,7 @@ class Player(Entity):
         rect = sprite.get_rect(midbottom=feet)
         surface.blit(sprite, rect)
         self.draw_sword(surface, rect, flash)
+        self.draw_damage(surface, (rect.centerx, rect.centery))
 
     def draw_sword(self, surface, rect, flash=0.0):
         """The sword, held steady in the hand the sprite points at the enemy."""

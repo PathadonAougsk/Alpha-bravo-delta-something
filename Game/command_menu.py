@@ -1,10 +1,11 @@
-"""The JRPG command ring: ATTACK, GUARD, ITEM.
+"""The JRPG command ring: ATTACK, GUARD, ITEM, MERCY.
 
 A blue wheel with a lettered button per command and the name spelled out
 beside it. The selected slot never moves: picking a command turns the whole
 wheel until that command arrives there, and every label rides around with it,
 tilting as it goes. Neighbours sit SPACING degrees off, so whatever is one
-step away reads at that tilt.
+step away reads at that tilt, and anything far enough round the back of the
+wheel has its label fade out rather than hang over the field upside down.
 """
 
 import math
@@ -14,6 +15,7 @@ import pygame
 ATTACK = "attack"
 GUARD = "guard"
 ITEM = "item"
+MERCY = "mercy"
 
 RING_COLOR = (42, 96, 232)
 RING_EDGE = (150, 200, 255)
@@ -28,6 +30,8 @@ PULSE_PIXELS = 2.4   # how much bigger that button swells
 BREATHE_PIXELS = 1.6  # and how much the ring behind it drifts in and out
 
 SPACING = 45       # degrees between neighbouring commands on the wheel
+FADE_FROM = 90     # degrees off the slot a label starts dropping away at...
+FADE_TO = 135      # ...and where it is gone, round the back of the wheel
 TURN_SPEED = 11.0  # how fast the wheel catches up with the pick, per second
 NOTCHES = 12       # ticks around the rim, so the turning is visible
 
@@ -53,6 +57,7 @@ class CommandMenu:
             Command(ATTACK, "ATTACK", "A", (1, 0), "right"),
             Command(GUARD, "GUARD", "B", (0, 1), "right"),
             Command(ITEM, "ITEM", "Y", (-1, 0), "left"),
+            Command(MERCY, "MERCY", "X", (0, -1), "left"),
         ]
         self.index = 0
         self.elapsed = 0.0  # drives the pulsing
@@ -176,7 +181,12 @@ class CommandMenu:
 
         turned = pygame.transform.rotate(plate, -angle)
         if not selected:
-            turned.set_alpha(180)
+            # the further round it has gone, the fainter it reads, until the
+            # far side of the wheel is carrying nothing but its button
+            left = 1 - max(0.0, (abs(angle) - FADE_FROM) / (FADE_TO - FADE_FROM))
+            if left <= 0:
+                return
+            turned.set_alpha(round(180 * left))
         # measured from the rim, not the button, so a short word like ITEM is
         # pushed as clear of the wheel as a long one
         reach = self.RADIUS + 14 + text.get_width() / 2

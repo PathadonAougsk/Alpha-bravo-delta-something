@@ -14,13 +14,18 @@ import assets
 from battle import Battle
 from command_menu import CommandMenu
 from enemy import Enemy
+from gunshot import Gunshot
 from intro import Intro
+from item_menu import ItemMenu
+from mercy import Mercy
 from outro import Outro
 from player import Player
 from stats import BASE
 
 WIDTH, HEIGHT = 800, 600
 FPS = 12
+MERCY_FPS = 48  # the mercy box is a dodging game: the battle can sit at 12
+                # frames, but something you steer away from bones cannot
 BG = (18, 18, 24)
 FLOOR = (26, 28, 40)
 END_LINGER = 2.5  # seconds the result banner stays up before the window closes
@@ -157,6 +162,9 @@ def main(argv=None, title=None):
     enemies = Enemy.formation(args.amount, WIDTH, HEIGHT, base=args.enemy)
     battle = Battle(player, enemies, base=args.base)
     menu = CommandMenu()
+    bag = ItemMenu()
+    gunshot = Gunshot(WIDTH, HEIGHT)
+    mercy = Mercy(WIDTH, HEIGHT)
     intro = Intro(WIDTH, HEIGHT)
     outro = Outro(WIDTH, HEIGHT)
 
@@ -166,7 +174,7 @@ def main(argv=None, title=None):
     message_age = 0.0
     shown_message = battle.message
     while running:
-        dt = clock.tick(FPS) / 1000.0
+        dt = clock.tick(MERCY_FPS if battle.dodging else FPS) / 1000.0
         elapsed += dt
 
         for event in pygame.event.get():
@@ -182,6 +190,28 @@ def main(argv=None, title=None):
             elif battle.over:
                 if event.type == pygame.KEYDOWN:
                     running = False  # any key skips the result banner
+            elif battle.choosing_target:
+                # the arrows drive the cursor over the field, not the wheel
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                        battle.move_target(1)
+                    elif event.key in (pygame.K_LEFT, pygame.K_UP):
+                        battle.move_target(-1)
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                        battle.confirm_target()
+                    elif event.key in (pygame.K_BACKSPACE, pygame.K_x):
+                        battle.cancel_target()
+            elif battle.choosing_item:
+                # same arrows, same keys: the bag works like the field cursor
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_DOWN, pygame.K_RIGHT):
+                        battle.move_item(1)
+                    elif event.key in (pygame.K_UP, pygame.K_LEFT):
+                        battle.move_item(-1)
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                        battle.confirm_item()
+                    elif event.key in (pygame.K_BACKSPACE, pygame.K_x):
+                        battle.cancel_item()
             elif battle.accepting_input:
                 action = menu.handle_event(event)
                 if action:
@@ -189,6 +219,19 @@ def main(argv=None, title=None):
 
         if intro.running:
             intro.advance(dt)
+        elif battle.watching_cutscene:
+            gunshot.advance(dt)
+            if gunshot.done:
+                battle.finish_cutscene()  # the shot has landed; the fight is lost
+        elif battle.dodging:
+            # the box runs off held keys rather than presses, so it is handed
+            # the keyboard itself instead of the events the rest of the game uses
+            if not mercy.live:
+                mercy.begin(player, battle.living_enemies)
+            mercy.advance(dt, pygame.key.get_pressed())
+            if mercy.done:
+                battle.finish_dodge(mercy.survived, mercy.taken)
+                mercy.clear()
         else:
             battle.update(dt)
 
@@ -207,6 +250,20 @@ def main(argv=None, title=None):
         if intro.covering:
             # nothing but the cut-out on black until it reaches its mark
             intro.draw(frame, player)
+            present(screen, frame, retro)
+            pygame.display.flip()
+            continue
+
+        if battle.watching_cutscene:
+            # the gun owns the screen outright: no field, no HUD, no message
+            gunshot.draw(frame, player)
+            present(screen, frame, retro)
+            pygame.display.flip()
+            continue
+
+        if battle.dodging and mercy.covering:
+            # the box owns the screen the way the gun does: no field, no HUD
+            mercy.draw(frame)
             present(screen, frame, retro)
             pygame.display.flip()
             continue
@@ -232,16 +289,29 @@ def main(argv=None, title=None):
 
         target = battle.target
         for fighter in battle.enemies:  # the beaten ones are still fading out
-            fighter.draw(frame, targeted=fighter is target and battle.accepting_input)
+            fighter.draw(frame, targeted=fighter is target and battle.choosing_target)
         player.draw(frame)
 
         if battle.accepting_input:
             # high enough that the wheel can swing a label a quarter turn
             # either way without running off the bottom of the screen
             menu.draw(frame, (player.pos.x + 120, player.pos.y - 90))
+        elif battle.choosing_item:
+            # the bag opens where the wheel was, so the eye does not have to move
+            bag.draw(
+                frame,
+                (player.pos.x + 120, player.pos.y - 90),
+                battle.stock,
+                battle.item_index,
+            )
 
         draw_player_bars(frame, font, player, battle.items)
         draw_message(frame, font, battle.message, message_age)
+
+        if battle.dodging:
+            # the last beat of the box: the black it left falls off the
+            # battle in panes, which have to go over the finished frame
+            mercy.draw(frame)
 
         if intro.running:
             intro.draw(frame, player)  # the black lifting off the finished frame

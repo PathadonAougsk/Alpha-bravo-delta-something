@@ -4,10 +4,20 @@ import math
 
 import pygame
 
+import assets
+
 HIT_FLASH = 0.32    # seconds an entity keeps flashing after it is hit
 LUNGE_TIME = 0.34   # seconds a lunge takes, there and back again
 LUNGE_REACH = 34    # pixels it covers at the furthest point of that lunge
 BAR_CATCHUP = 1.5   # how fast a bar chases its number, in full bars a second
+
+# The number that pops off whoever just took a hit.
+DAMAGE_TIME = 0.95        # seconds it stays up
+DAMAGE_RISE = 40          # pixels it floats on the way out
+DAMAGE_SIZE = 38          # how big it is drawn
+DAMAGE_FADE = 0.45        # the last fraction of its life is spent fading
+DAMAGE_COLOR = (255, 226, 120)
+DAMAGE_SHADOW = (26, 14, 10)
 
 
 def approach(shown, target, step):
@@ -49,6 +59,8 @@ class Entity:
         self.lunge_direction = pygame.Vector2()
         self.shown_health = float(health)  # what the bars are displaying...
         self.shown_mana = float(mana)      # ...on their way to the real number
+        self.damage = None        # the last number taken off this entity
+        self.damage_timer = 0.0   # counts down while that number is up
 
     @property
     def alive(self):
@@ -60,6 +72,7 @@ class Entity:
         self.elapsed += dt
         self.hit_timer = max(0.0, self.hit_timer - dt)
         self.lunge_timer = max(0.0, self.lunge_timer - dt)
+        self.damage_timer = max(0.0, self.damage_timer - dt)
         self.shown_health = approach(
             self.shown_health, self.health, self.max_health * BAR_CATCHUP * dt
         )
@@ -93,6 +106,8 @@ class Entity:
             amount = max(1, amount // 2)
         self.health = max(0, self.health - amount)
         self.hit_timer = HIT_FLASH
+        # what actually came off, guard and all, is what the number shows
+        self.damage, self.damage_timer = amount, DAMAGE_TIME
         return self.health
 
     def guard(self):
@@ -122,6 +137,25 @@ class Entity:
 
     def draw(self, surface):
         pygame.draw.circle(surface, self.color, self.pos, self.radius)
+
+    def draw_damage(self, surface, anchor):
+        """The number that came off this entity, floating up and fading out."""
+        if self.damage is None or self.damage_timer <= 0:
+            return
+        done = 1 - self.damage_timer / DAMAGE_TIME
+        text = assets.font(DAMAGE_SIZE).render(str(self.damage), True, DAMAGE_COLOR)
+        shadow = assets.font(DAMAGE_SIZE).render(str(self.damage), True, DAMAGE_SHADOW)
+        # a quick pop out of the body, then a slow drift: ease_out on the rise
+        rise = DAMAGE_RISE * (1 - (1 - done) ** 2)
+        spot = text.get_rect(center=(anchor[0], anchor[1] - rise))
+        if done > 1 - DAMAGE_FADE:
+            alpha = round(255 * (1 - done) / DAMAGE_FADE)
+            text, shadow = text.copy(), shadow.copy()
+            text.set_alpha(alpha)
+            shadow.set_alpha(alpha)
+        for step in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            surface.blit(shadow, spot.move(step))
+        surface.blit(text, spot)
 
     def __repr__(self):
         return (
