@@ -12,10 +12,15 @@ branch holds 123 bytes against HEAD's 120 gives the player a 0.3% edge.
 
 import argparse
 import importlib.util
+import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 GAME_DIR = Path(__file__).resolve().parent / "Game"
+LOSS_STREAK_FILE = ".feature_branch_loss_streak"
+LOSS_LIMIT = 3
 
 # What each side of a hunk fights at. A side's baseline is its empty-handed
 # value plus PER_BYTE for every byte it holds, so the bigger half of a conflict
@@ -109,8 +114,74 @@ def baseline(length, empty_handed):
     return round(empty_handed * (1 + PER_BYTE * length), 4)
 
 
-def fight_conflicts(game, pieces, filename):
-    """Play one single-enemy battle per hunk. None if a battle is abandoned."""
+def remove_merge_backup(merged):
+    """Remove this merge's .orig backup, if present."""
+    backup = merged.with_name(merged.name + ".orig")
+    try:
+        backup.unlink(missing_ok=True)
+    except OSError as error:
+        print(f"Could not remove {backup}: {error}", file=sys.stderr)
+
+
+def find_repository_root(merged):
+    """Find the merged file's repository, requiring a real .git directory."""
+    directory = merged.resolve().parent
+    for candidate in (directory, *directory.parents):
+        git_dir = candidate / ".git"
+        if git_dir.is_symlink() or git_dir.exists():
+            if git_dir.is_symlink() or not git_dir.is_dir():
+                raise ValueError(
+                    f"{git_dir}: loss tracking requires a regular .git directory; "
+                    "linked worktrees and symlinks are unsupported"
+                )
+            return candidate
+    raise ValueError(f"{merged}: no repository with a .git directory found")
+
+
+def read_loss_streak(repository):
+    """Read the persisted streak; a new repository starts at zero."""
+    path = repository / LOSS_STREAK_FILE
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return 0
+    if not value.isascii() or not value.isdecimal():
+        raise ValueError(f"{path}: expected a nonnegative integer loss streak")
+    return int(value)
+
+
+def record_battle_result(repository, streak, won):
+    """Persist a completed battle and remove .git at the loss limit."""
+    streak = 0 if won else streak + 1
+    path = repository / LOSS_STREAK_FILE
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=repository,
+            prefix=LOSS_STREAK_FILE + ".", delete=False,
+        ) as output:
+            temporary = Path(output.name)
+            output.write(f"{streak}\n")
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+    print(f"Feature Branch: {streak} consecutive loss(es) (saved in {path}).")
+    if streak >= LOSS_LIMIT:
+        git_dir = repository / ".git"
+        if git_dir.is_symlink() or not git_dir.is_dir():
+            raise ValueError(f"Refusing to remove {git_dir}: not a regular directory")
+        print(f"Feature Branch lost {LOSS_LIMIT} times in a row; removing {git_dir}.")
+        shutil.rmtree(git_dir)
+    return streak
+
+
+def fight_conflicts(game, pieces, merged):
+    """Play each hunk; return None on abandonment or repository deletion."""
+    repository = find_repository_root(merged)
+    streak = read_loss_streak(repository)
+    filename = merged.name
     hunks = [piece for piece in pieces if isinstance(piece, tuple)]
     total = len(hunks)
     keep_head = []
@@ -127,8 +198,12 @@ def fight_conflicts(game, pieces, filename):
         won = game.main(
             [f"--base={player_stats}", f"--enemy={head_stats}", "--amount=1"],
             title=f"Git Merge Tool - {filename} - conflict {number}/{total}",
+            before_close=lambda: remove_merge_backup(merged),
         )
         if won is None:
+            return None
+        streak = record_battle_result(repository, streak, won)
+        if streak >= LOSS_LIMIT:
             return None
         keep_head.append(not won)
 
@@ -166,9 +241,13 @@ def main() -> int:
 
     game = load_game()
     print(f"{name}: {total} conflict hunk(s), {total} battle(s) to play.")
-    keep_head = fight_conflicts(game, pieces, name)
+    try:
+        keep_head = fight_conflicts(game, pieces, args.merged)
+    except (OSError, ValueError) as error:
+        print(f"{name}: could not track battle results: {error}", file=sys.stderr)
+        return 1
     if keep_head is None:
-        print(f"{name}: battle abandoned, conflict left unresolved.")
+        print(f"{name}: battles stopped, merged file left untouched.")
         return 1
 
     try:

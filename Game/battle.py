@@ -20,7 +20,9 @@ class Battle:
         self.items = items
         self.item_heal = max(1, round(base * ITEM_HEAL))
         self.state = PLAYER_TURN
-        self.message = "Arrows pick a command, Enter confirms."
+        self.message = "Arrows + Enter: command. A: autobattle."
+        self.autobattle_enabled = False
+        self._first_turn = True
         self.timer = 0.0
         self._queue = []
         if not self.living_enemies:
@@ -44,7 +46,12 @@ class Battle:
 
     @property
     def accepting_input(self):
-        return self.state == PLAYER_TURN
+        return self.state == PLAYER_TURN and not self.autobattle_enabled
+
+    @property
+    def can_autobattle(self):
+        """Whether autobattle can still be started on the opening turn."""
+        return self.accepting_input and self._first_turn
 
     @property
     def living_enemies(self):
@@ -58,20 +65,34 @@ class Battle:
 
     # ----------------------------------------------------------------- actions
 
+    def autobattle(self):
+        """Start automatic attacks on the first turn; return whether started."""
+        if not self.can_autobattle:
+            return False
+        self.autobattle_enabled = True
+        self._run_player_command(ATTACK)
+        return True
+
     def player_command(self, action):
         """Run the chosen command. Anything that costs a turn hands over to the enemies."""
         if not self.accepting_input:
             return
+        self._run_player_command(action)
 
+    def _run_player_command(self, action):
         if action == ATTACK:
             target = self.target
             if target is None:
                 return
+            before = target.health
             self.player.attack(target)
+            dealt = before - target.health
             self.message = (
                 f"{self.player.name} hits {target.name} "
-                f"for {self.player.attack_damage}!"
+                f"for {dealt}!"
             )
+            if self.player.last_attack_critical:
+                self.message += " Critical hit!"
             if not target.alive:
                 self.message += f" {target.name} is down."
 
@@ -90,11 +111,16 @@ class Battle:
         else:
             return
 
+        self._first_turn = False
         self._begin(RESOLVING)
 
     def update(self, dt):
         """Drive the non-interactive parts of the turn on a timer."""
-        if self.over or self.state == PLAYER_TURN:
+        if self.over:
+            return
+        if self.state == PLAYER_TURN:
+            if self.autobattle_enabled:
+                self._run_player_command(ATTACK)
             return
 
         self.timer -= dt
@@ -121,9 +147,11 @@ class Battle:
             enemy.attack(self.player)
             dealt = before - self.player.health
             self.message = f"{enemy.name} hits {self.player.name} for {dealt}!"
+            if enemy.last_attack_critical:
+                self.message += " Critical hit!"
             if not self.player.alive:
                 self.state = DEFEAT
-                self.message = f"{enemy.name} finishes {self.player.name} off - DEFEAT."
+                self.message += f" {self.player.name} is down - DEFEAT."
                 return
             self._begin(ENEMY_TURN)
             return

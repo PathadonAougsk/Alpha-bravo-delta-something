@@ -16,6 +16,25 @@ branch. Only the conflicted hunks are rewritten. Lines Git already merged
 cleanly stay exactly as they are, and the conflict markers are removed either
 way.
 
+## Consecutive losses
+
+Each completed hunk battle saves the Feature Branch's consecutive loss count
+in `.feature_branch_loss_streak` at the root of the repository containing
+`MERGED`. The count persists across files and program runs. A win resets it
+to zero; quitting a battle does not change it. Results from earlier completed
+battles still count if a later battle is abandoned.
+
+**Three consecutive losses automatically delete that repository's entire
+`.git` directory**, including its local history, branches, configuration, and
+staged changes. This is destructive. The third loss stops any remaining
+battles, leaves `MERGED` untouched, and exits 1. Working files and the saved
+loss count remain on disk. Use disposable repositories if you want to try
+this behavior.
+
+Loss tracking requires a regular `.git` directory; linked worktrees and
+symlinked `.git` directories are rejected before any battle. Standalone
+`Game/main.py` battles do not track losses or delete repositories.
+
 ## Stats come from the conflict
 
 Neither fighter has stats of its own: each one is as strong as the side of the
@@ -45,6 +64,7 @@ absolute paths below with your Python interpreter and this project's `main.py`:
 git config merge.tool pygame
 git config mergetool.pygame.cmd '"/absolute/path/to/python" "/absolute/path/to/main.py" "$BASE" "$LOCAL" "$REMOTE" "$MERGED"'
 git config mergetool.pygame.trustExitCode true
+git config mergetool.keepBackup false
 ```
 
 Then run `git mergetool` during a merge conflict. Git passes four file paths:
@@ -61,13 +81,31 @@ battles are over exits 1 and leaves the file alone. If the markers in `$MERGED`
 do not pair up, nothing is played and nothing is written: there is no end of a
 hunk for a battle to decide.
 
+Before each battle window closes, the program removes the corresponding
+`MERGED.orig` backup if it exists, including when you quit mid-fight. The
+`mergetool.keepBackup false` setting above also prevents Git from creating a
+new `.orig` backup after the program exits.
+
 ## The battle
 
 Arrow keys pick a command on the ring, Enter confirms:
 
-- **ATTACK** - hit the targeted HEAD for your attack damage.
+- **ATTACK** - hit the targeted HEAD for your attack damage, varied by +/-10%
+  on each attack and rounded to a whole number (minimum 1).
 - **GUARD** - halve the damage you take for the coming round.
 - **ITEM** - heal; you start with three.
+
+Press **A** on your first turn, before using a command, to start **autobattle**.
+The player immediately attacks and automatically attacks the next living HEAD
+on every following turn until victory or defeat. Enemies still take their
+normal turns; autobattle does not guard or use healing items. It lasts for the
+current battle, and Escape or closing the window still quits early. If the
+intro is running, the first key only skips it; press A once the fight begins.
+
+Both Feature Branch and each HEAD roll this damage variation on every attack
+and have a 2% chance to land a critical hit for triple the rolled damage.
+Guard still halves incoming damage, including
+critical hits, and the battle message announces each critical hit.
 
 The ring is a wheel, and the selected slot is fixed: picking a command turns
 the whole wheel until that command arrives there, rather than moving a
@@ -143,4 +181,11 @@ game on its own to pick the baselines by hand and fight any number of enemies:
 
 ```sh
 python Game/main.py --base=50 --enemy=168 --amount=1
+```
+
+Run the automated battle and merge checks from the repository root (deletion
+checks use disposable temporary directories):
+
+```sh
+python -m unittest discover -s tests
 ```

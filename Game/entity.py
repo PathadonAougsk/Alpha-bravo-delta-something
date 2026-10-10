@@ -1,8 +1,13 @@
 """Base class shared by everything that lives, fights and gets drawn."""
 
 import math
+import random
 
 import pygame
+
+CRIT_CHANCE = 0.02
+CRIT_MULTIPLIER = 3
+DAMAGE_SPREAD = 0.10
 
 HIT_FLASH = 0.32    # seconds an entity keeps flashing after it is hit
 LUNGE_TIME = 0.34   # seconds a lunge takes, there and back again
@@ -37,6 +42,7 @@ class Entity:
         self.max_mana = mana
         self.mana = mana
         self.attack_damage = attack_damage
+        self.last_attack_critical = False
         self.radius = radius
         self.color = color
         self.guarding = False
@@ -115,9 +121,15 @@ class Entity:
         return self.mana
 
     def attack(self, target):
-        """Hit another entity for this entity's attack damage."""
+        """Roll damage within +/-10%, apply criticals, and return target health."""
         self.lunge_at(target)
-        target.take_damage(self.attack_damage)
+        self.last_attack_critical = random.random() < CRIT_CHANCE
+        damage = max(1, round(self.attack_damage * random.uniform(
+            1 - DAMAGE_SPREAD, 1 + DAMAGE_SPREAD
+        )))
+        if self.last_attack_critical:
+            damage *= CRIT_MULTIPLIER
+        target.take_damage(damage)
         return target.health
 
     def draw(self, surface):
