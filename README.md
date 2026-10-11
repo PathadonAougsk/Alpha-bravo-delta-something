@@ -433,13 +433,3 @@ The agent checks run without the MCP dependency. Installing
 python -m unittest discover -s tests
 python -m compileall -q main.py Game mcp_game_server.py tests
 ```
-
-## Credits
-
-The opening song is **"It's Going Down Now"** from *Persona 3 Reload*
-(ATLUS / SEGA). Taken from:
-
-<https://www.youtube.com/watch?v=v6PDPMQVGDM>
-
-The audio file itself is not in this repository - drop your own copy in
-`Assets/` as `opening.ogg` and the game will pick it up.
