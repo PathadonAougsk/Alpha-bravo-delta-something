@@ -348,6 +348,92 @@ checks use disposable temporary directories):
 python -m unittest discover -s tests
 ```
 
+## AI agents and MCP
+
+The optional local MCP server lets an agent play standalone battles through the
+same `Battle`, `Player`, `Enemy` and `Determination` engines as the keyboard game.
+It runs headlessly, pauses between tool calls, and starts in manual mode even if
+`ALWAYS_AUTOBATTLE` is enabled. It does not attach to an existing window or use
+the Git merge entry point: results stay in memory, with no loss-streak updates,
+merge-file writes or repository deletion.
+
+Use Python 3.10 or newer and install the optional server dependencies:
+
+```sh
+python -m venv venv
+venv/bin/python -m pip install -r requirements-mcp.txt
+```
+
+The server uses the official MCP Python SDK's 1.x `FastMCP` interface, pinned
+below 2 in `requirements-mcp.txt` ([SDK documentation](https://py.sdk.modelcontextprotocol.io/v1/)).
+Regular keyboard play still needs only `requirements.txt`.
+
+Configure your MCP host to launch the server over **stdio**, using absolute
+paths. For hosts using `mcpServers` JSON, add this entry and replace the paths:
+
+```json
+{
+  "mcpServers": {
+    "pygame-battle": {
+      "command": "/absolute/path/to/project/venv/bin/python",
+      "args": ["/absolute/path/to/project/mcp_game_server.py"]
+    }
+  }
+}
+```
+
+The host launches `mcp_game_server.py`; running it manually waits for MCP
+messages on stdin. No display, audio device or working-directory setting is
+needed. The server reserves stdout for MCP messages.
+
+| Tool | Behavior |
+| --- | --- |
+| `start_battle(base=50, enemy_base=168, amount=1, seed=null)` | Return a new session id, rolled stats and legal actions. Baselines are 1–10000; amount is 0–10. |
+| `observe_battle(session_id)` | Read HP, inventory, stable enemy ids, legal actions and visible hazards without advancing time. |
+| `play_turn(session_id, action, target=0)` | Use `attack`, `guard`, `health`, `gun`, `spare` or `flee`; resolve the full enemy round. Attack targets use enemy ids. |
+| `dodge_step(session_id, direction="still", frames=6)` | Hold a direction for 1–48 frames at 48 FPS during DETERMINATION. Cardinal and diagonal directions are supported. |
+| `battle_screenshot(session_id)` | Return a PNG with the game's sprites, an agent HUD and the actual dodge box. |
+| `quit_battle(session_id)` | Release the session; unfinished play returns `abandoned` and a null result. Completed results are retained in this final response. |
+
+Read `battle://rules` for a compact rules resource. Each state response includes
+`session_id`, `state`, `result`, `events`, `player`, `enemies`, `inventory`,
+`heal_amount`, `available_actions` and `dodge`. `result` is true for victory,
+false for defeat, and null while unfinished. Enemy ids remain stable when
+other enemies die. Invalid or unavailable actions return a tool error without
+spending a turn.
+
+For example, start with `{"base":50,"enemy_base":50,"amount":1,"seed":7}`,
+then call `play_turn` with `{"session_id":"<returned id>","action":"attack","target":0}`.
+Inspect each response and repeat until victory or defeat, then release the
+session with `quit_battle`. Seeds reproduce combat and dodge patterns; separate
+sessions do not share random sequences. At most eight sessions coexist, and
+all are lost when the server stops.
+
+The MCP skips cosmetic intros, menus and cutscenes. `gun` still produces the
+game's deliberate defeat. `spare` at half HP starts a real collision-driven
+dodge wave: time advances only through `dodge_step`, including the opening and
+ending phases. Surviving restores HP; blue walls require releasing movement
+with `still`. Screenshots omit the keyboard game's command wheel, music and
+retro filter.
+
+Agent skill files are included in
+[`skills/pygame-battle/SKILL.md`](skills/pygame-battle/SKILL.md) and
+[`skills/pygame-determination/SKILL.md`](skills/pygame-determination/SKILL.md).
+The first guides full battles; the second covers hazard geometry and dodging.
+Both include Codex UI metadata. Let an agent read them directly, or copy the
+two complete folders into its skill directory. For repository-local Codex
+discovery, copy them into `.agents/skills/` in your checkout. Other hosts can
+use the Markdown instructions in their own skill or instruction mechanism.
+Skill files do not connect the server automatically; configure MCP as above.
+
+The agent checks run without the MCP dependency. Installing
+`requirements-mcp.txt` also enables a real stdio client/server integration test:
+
+```sh
+python -m unittest discover -s tests
+python -m compileall -q main.py Game mcp_game_server.py tests
+```
+
 ## Credits
 
 The opening song is **"It's Going Down Now"** from *Persona 3 Reload*

@@ -1,0 +1,9 @@
+interface:
+  display_name: "Play Pygame Battle"
+  short_description: "Play Feature Branch versus HEAD through MCP"
+  default_prompt: "Use $pygame-battle to play a battle and try to win."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "pygame-battle"
+      description: "Standalone paused Pygame battle server"

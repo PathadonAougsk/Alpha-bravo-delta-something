@@ -36,6 +36,9 @@ class Fighter(Entity):
 
 class AutobattleTests(unittest.TestCase):
     def setUp(self):
+        manual = patch("battle.ALWAYS_AUTOBATTLE", False)
+        manual.start()
+        self.addCleanup(manual.stop)
         # Keep damage deterministic while exercising the normal attack path.
         critical = patch("entity.random.random", return_value=1.0)
         spread = patch("entity.random.uniform", return_value=1.0)
@@ -176,6 +179,9 @@ class DeterminationChoiceTests(unittest.TestCase):
     """DETERMINATION opens the text box; what determination means is the second question."""
 
     def setUp(self):
+        manual = patch("battle.ALWAYS_AUTOBATTLE", False)
+        manual.start()
+        self.addCleanup(manual.stop)
         self.player = Entity((0, 0), health=100, attack_damage=10)
         self.enemy = Fighter((1, 0), health=30, attack_damage=5)
         self.battle = Battle(self.player, [self.enemy])
@@ -244,6 +250,9 @@ class DeterminationWaveTests(unittest.TestCase):
     """What the wave costs, and what living through it pays."""
 
     def setUp(self):
+        manual = patch("battle.ALWAYS_AUTOBATTLE", False)
+        manual.start()
+        self.addCleanup(manual.stop)
         self.player = Entity((0, 0), health=100, attack_damage=10)
         self.player.health = 30  # hurt enough for DETERMINATION to open
         self.enemy = Fighter((1, 0), health=30, attack_damage=5)

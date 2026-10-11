@@ -1,0 +1,9 @@
+interface:
+  display_name: "Dodge DETERMINATION"
+  short_description: "Steer the heart through the real MCP dodge wave"
+  default_prompt: "Use $pygame-determination to survive the active dodge wave."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "pygame-battle"
+      description: "Standalone paused Pygame battle server"
