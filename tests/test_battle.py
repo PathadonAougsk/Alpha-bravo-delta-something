@@ -144,6 +144,33 @@ class AutobattleTests(unittest.TestCase):
         self.assertFalse(fresh.autobattle_enabled)
         self.assertTrue(fresh.can_autobattle)
 
+    @patch("battle.ALWAYS_AUTOBATTLE", True)
+    def test_override_starts_each_battle_on_update_and_keeps_attacking(self):
+        for _ in range(2):
+            with self.subTest(battle=_):
+                self.player = Entity((0, 0), health=100, attack_damage=10)
+                self.enemy = Fighter((1, 0), health=30, attack_damage=5)
+                self.battle = Battle(self.player, [self.enemy])
+                self.assertTrue(self.battle.autobattle_enabled)
+                self.assertFalse(self.battle.accepting_input)
+                self.assertEqual(self.enemy.health, 30)
+                self.battle.player_command(GUARD)
+                self.assertFalse(self.player.guarding)
+                self.battle.update(0)
+                self.assertEqual(self.enemy.health, 20)
+                self.finish_round()
+                self.assertEqual(self.player.health, 95)
+                self.battle.update(0)
+                self.assertEqual(self.enemy.health, 10)
+
+    @patch("battle.ALWAYS_AUTOBATTLE", True)
+    def test_override_leaves_empty_battle_finished_without_attacking(self):
+        empty = Battle(self.player, [])
+        empty.update(BEAT)
+        self.assertEqual(empty.state, VICTORY)
+        self.assertFalse(empty.autobattle_enabled)
+        self.assertEqual(self.player.health, 100)
+
 
 class DeterminationChoiceTests(unittest.TestCase):
     """DETERMINATION opens the text box; what determination means is the second question."""

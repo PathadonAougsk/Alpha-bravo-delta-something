@@ -228,6 +228,11 @@ open the bag or stand its ground. It lasts for the current battle, and
 closing the window still quits early. If the intro is running, the first key
 only skips it; press A once the fight begins.
 
+To enable autobattle automatically for every battle, set
+`ALWAYS_AUTOBATTLE = True` near the top of `Game/battle.py`. Attacks start
+after the intro without pressing A. This applies to standalone battles and
+Git merge battles. Set it back to `False` to restore manual activation.
+
 Escape does nothing. It is swallowed before anything else sees it, so a
 stray press cannot drop you out of a fight, skip the intro or dismiss the
 result - closing the window is the way out.

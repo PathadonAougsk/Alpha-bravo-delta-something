@@ -27,6 +27,7 @@ WAITING = (
 
 STARTING_ITEMS = 3
 BEAT = 0.8  # seconds a result message stays up before the next actor moves
+ALWAYS_AUTOBATTLE = True  # set to True to enable autobattle for every battle
 
 # What DETERMINATION turns out to mean, once you have picked it. Standing
 # there and sparing them is the dare the box was built for; running is the
@@ -83,6 +84,9 @@ class Battle:
         if not self.living_enemies:
             self.state = VICTORY
             self.message = "Nothing to fight."
+        elif ALWAYS_AUTOBATTLE:
+            self.autobattle_enabled = True
+            self.message = "Autobattle active."
 
     # ------------------------------------------------------------------ state
 
